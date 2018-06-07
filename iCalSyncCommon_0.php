@@ -19,16 +19,14 @@ class iCalSyncCommon extends ModuleCommon {
     }
      // SERVER  -> EPESI
     public static function update() {
-          $helper = new helper();
-          //get all user who have set calURL
-          $users_count = DB::GetAll("SELECT COUNT(*) FROM contact_data_1 WHERE f_calendar_url != '' ");
-          $users_count = $users_count[0][0];
-          $users_to_sync = DB::GetArray("SELECT f_login , f_calendar_url FROM contact_data_1 WHERE f_calendar_url != '' ");
-          //loop for all users
-          for($u =0;$u<$users_count;$u++){      
-          $client = new CalDAVClient($users_to_sync[$u]["f_calendar_url"],"test","test");
+         $helper = new helper();
+         $rbo = new RBO_RecordsetAccessor('contact');
+         $users_urls = $rbo->get_records(array('!calendar_url' => ''));
+         foreach($users_urls as $user ){      
+          $client = new CalDAVClient($user->get_val('calendar_url'),"test","test");
           $start = $helper->get_date();
           $result = $client->GetEvents($start);
+      
 //for meetings
           for( $i = 0; $i < count($result); $i++) {
                $exist = false;
@@ -41,27 +39,37 @@ class iCalSyncCommon extends ModuleCommon {
                 $summary = $event[0]["SUMMARY"]; 
                 $uid = $event[0]["UID"];
                 $time = $event[0]["DTSTART"];
-                $time = $helper->convert_date_time($time);// $this->convert_date_time($time);
+                $time = $helper->convert_date_time($time);
                
-                $catch = DB::GetAll("SELECT * FROM public.crm_meeting_data_1 WHERE  f_related = '$uid'");
-                $catch2 = DB::GetAll("SELECT * FROM public.phonecall_data_1 WHERE  f_related = '$uid'");
-                $catch3 = DB::GetAll("SELECT * FROM public.task_data_1 WHERE  f_related = '$uid'");
+                $rbo_meet =  new RBO_RecordsetAccessor('crm_meeting');
+                $rbo_phone =  new RBO_RecordsetAccessor('phonecall');
+                $rbo_task =  new RBO_RecordsetAccessor('task');
+                $catch = $rbo_meet->get_records(array('uid' => $uid));
+                $catch2 = $rbo_phone->get_records(array('uid' => $uid));
+                $catch3 = $rbo_task->get_records(array('uid' => $uid));
                 if($catch != null or $catch2 != null or $catch3 != null){ $exist = true;}
                 if($exist == false){
                 $description = "[M]";
-                if($event[0]["DESCRIPTION"]){
+                if(isset($event[0]["DESCRIPTION"])){
                 $description = $event[0]["DESCRIPTION"];}
                 $description = $description.=" Dodano z kalendarza Google";
                 $start = $event[0]["DTSTART"];
-                $date = $helper->convert_date($start);// $this->convert_date($start);
-                $start = $helper->convert_date_time($start); // $this->convert_date_time($start);
+                $date = $helper->convert_date($start);
+                $start = $helper->convert_date_time($start);
                 $now = date("Y-m-d H:i:s");
-                DB::Execute("INSERT INTO public.crm_meeting_data_1 "
-                        . "(created_by,created_on, f_title,f_description,f_date,f_time,f_duration,f_employees,f_status,f_priority,f_permission,f_related) "
-                        . "VALUES( ".$users_to_sync[$u]['f_login'].",'$now', '$summary','$description','$date','$start',3600,'__".$users_to_sync[$u]['f_login']."__',0,1,0,'$uid')");
-         }
+                $id = $user->id;
+                $data = array('uid' => $uid, 'Title' => $summary, 'date' => $date,'time' => $start,'duration' => 3600,'status' => '0', 'priority' => '1', 'permission' => 0, 'Employees' => $id);
+                $event = $rbo_meet->new_record($data);
+                $event->created_by = $user->get_val('login');
+                $event->created_on = $now;
+                
+                $event->save();
+
+                        
+                }
         } 
        }
+      
     }
     // EPESI EVENTS --> SERVER
  public static function push_events(){

@@ -8,6 +8,18 @@ require 'client/CalDAVException.php';
 require 'client/SimpleCalDAVClient.php';
 require 'client/class.iCalReader.php';
 require 'client/helper.php';
+
+class Connetion_data  {
+    public static function login(){
+        $login = "your_login";
+        return $login;
+    }
+    public static function password(){
+        $password = "your_password";
+        return $password;  
+    }
+    
+}
 class iCalSyncCommon extends ModuleCommon {
 
 
@@ -19,13 +31,12 @@ class iCalSyncCommon extends ModuleCommon {
     }
      // SERVER  -> EPESI
     public static function update() {
-         $helper = new helper();
-          $login = "your_login";
-          $password = "your_password";
+          $helper = new helper();
           $rbo = new RBO_RecordsetAccessor('contact');
           $users_urls = $rbo->get_records(array('!calendar_url' => ''));
           foreach($users_urls as $user ){      
-          $client = new CalDAVClient($user->get_val('calendar_url'),$login,$password);
+          $Connetion_data = "Connetion_data";
+          $client = new CalDAVClient($user->get_val('calendar_url'), Connetion_data::login(),Connetion_data::password());
           $start = $helper->get_date();
           $result = $client->GetEvents($start);
           for( $i = 0; $i < count($result); $i++) {
@@ -69,9 +80,7 @@ class iCalSyncCommon extends ModuleCommon {
     }
     // EPESI EVENTS --> SERVER
  public static function push_events(){
-     $helper = new helper();
-    $login = "your_login";
-    $password = "your_password";
+    $helper = new helper();
     $date = date_create(date('Y-m-d'));
     date_sub($date, date_interval_create_from_date_string('14 days'));
     $date =  date_format($date, 'Y-m-d');
@@ -130,7 +139,7 @@ END:VCALENDAR';
         $rbo = new RBO_RecordsetAccessor('contact');
         $user = $rbo->get_record($employer);
         if($user->get_val('calendar_url') != ''){ 
-            $client->connect($user->get_val('calendar_url'), $login, $password);
+            $client->connect($user->get_val('calendar_url'), Connetion_data::login(),Connetion_data::password());
             $arrayOfCalendars = $client->findCalendars(); 
             $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
             $event = $helper->change_data($event,'{{CR}}',$created);
@@ -197,7 +206,7 @@ END:VCALENDAR';
     foreach ($employes as $employer){
         $user = $rbo->get_record($employer);
         if($user->get_val('calendar_url') != ''){ 
-            $client->connect($user->get_val('calendar_url'), $login, $password);
+            $client->connect($user->get_val('calendar_url'),Connetion_data::login(),Connetion_data::password());
             $arrayOfCalendars = $client->findCalendars(); 
             $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
             $event = $helper->change_data($event,'{{CR}}',$created);
@@ -286,7 +295,7 @@ END:VCALENDAR';
         $user = $rbo->get_record($employer);
         if($user->get_val('calendar_url') != ''){ 
             $client = new SimpleCalDAVClient();
-            $client->connect($user->get_val('calendar_url'), $login, $password);
+            $client->connect($user->get_val('calendar_url'), Connetion_data::login(),Connetion_data::password());
             $arrayOfCalendars = $client->findCalendars(); 
             $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
             $event = $helper->change_data($event,'{{CR}}',$created);

@@ -17,8 +17,7 @@ class Connetion_data  {
     public static function password(){
         $password = "your_password";
         return $password;  
-    }
-    
+    }  
 }
 class iCalSyncCommon extends ModuleCommon {
 

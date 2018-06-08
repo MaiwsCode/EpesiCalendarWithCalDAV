@@ -19,9 +19,9 @@ class iCalSyncCommon extends ModuleCommon {
     }
      // SERVER  -> EPESI
     public static function update() {
-          $helper = new helper();
-          $login = "mat";
-          $password = "mat";
+         $helper = new helper();
+          $login = "your_login";
+          $password = "your_password";
           $rbo = new RBO_RecordsetAccessor('contact');
           $users_urls = $rbo->get_records(array('!calendar_url' => ''));
           foreach($users_urls as $user ){      
@@ -69,84 +69,87 @@ class iCalSyncCommon extends ModuleCommon {
     }
     // EPESI EVENTS --> SERVER
  public static function push_events(){
-        $login = "mat";
-        $password = "mat";
-        $helper = new helper();
-        $date = date_create(date('Y-m-d'));
-        date_sub($date, date_interval_create_from_date_string('14 days'));
-        $date =  date_format($date, 'Y-m-d');
+     $helper = new helper();
+    $login = "your_login";
+    $password = "your_password";
+    $date = date_create(date('Y-m-d'));
+    date_sub($date, date_interval_create_from_date_string('14 days'));
+    $date =  date_format($date, 'Y-m-d');
+    $rbo = new RBO_RecordsetAccessor('contact');
+    $client = new SimpleCalDAVClient();
+    $rbo_meet =  new RBO_RecordsetAccessor('crm_meeting');
+    $get_days = $rbo_meet->get_records(array('>=date' => $date,'uid' => ''));
+    //for meetings
+    foreach($get_days as $day){   
+   $event = 'BEGIN:VCALENDAR
+PRODID:-//SomeExampleStuff//EN
+VERSION:2.0
+BEGIN:VTIMEZONE
+TZID:Europe/Berlin
+X-LIC-LOCATION:Europe/Berlin
+BEGIN:DAYLIGHT
+TZOFFSETFROM:+0100
+TZOFFSETTO:+0200
+TZNAME:CEST
+DTSTART:19700329T020000
+RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3
+END:DAYLIGHT
+BEGIN:STANDARD
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0100
+TZNAME:CET
+DTSTART:19701025T030000
+RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+CREATED:{{CR}}
+LAST-MODIFIED:{{MOD}}
+DTSTAMP:{{STMP}}
+UID:{{UNICAL}}
+SUMMARY:{{SUMAR}}
+DTSTART;TZID=Europe/Berlin:{{ST}}
+DTEND;TZID=Europe/Berlin:{{END}}
+DESCRIPTION:{{DESC}}
+END:VEVENT
+END:VCALENDAR';
+   //if f_related != null 
+   $created = $day->created_on;
+   $extra_data = $day->to_array();
+   $desc = $extra_data["description"];
+   $sumary = $extra_data["title"];
+   $st = $day->get_val('date')." ".$day->get_val('time').":00";
+   $end = $st;   
+   $new_uid = "EPESIexportMeetings".$day->id;
+   $new_uid = str_replace(" ", "", $new_uid);
+   $st = $helper->toTimeCAL($st);
+   $end = $helper->toTimeCAL($end);
+   $created = $helper->toTimeCAL($created)."Z";
+   $employes = $extra_data["employees"];
+   foreach ($employes as $employer ){
         $rbo = new RBO_RecordsetAccessor('contact');
-        $users = $rbo->get_records(array('!calendar_url' => ''));
-        foreach($users as $user){     
-        $client = new SimpleCalDAVClient();
-        $client->connect($user->get_val('calendar_url'), $login, $password);
-	$arrayOfCalendars = $client->findCalendars(); 
-	$client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-        $rbo_meet =  new RBO_RecordsetAccessor('crm_meeting');
-        $get_days = $rbo_meet->get_records(array('created_by' => '1' , '>=date' => $date,'uid' => ''));
-        //for meetings
-       foreach($get_days as $day){  
-   $event = 'BEGIN:VCALENDAR
-PRODID:-//SomeExampleStuff//EN
-VERSION:2.0
-BEGIN:VTIMEZONE
-TZID:Europe/Berlin
-X-LIC-LOCATION:Europe/Berlin
-BEGIN:DAYLIGHT
-TZOFFSETFROM:+0100
-TZOFFSETTO:+0200
-TZNAME:CEST
-DTSTART:19700329T020000
-RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3
-END:DAYLIGHT
-BEGIN:STANDARD
-TZOFFSETFROM:+0200
-TZOFFSETTO:+0100
-TZNAME:CET
-DTSTART:19701025T030000
-RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10
-END:STANDARD
-END:VTIMEZONE
-BEGIN:VEVENT
-CREATED:{{CR}}
-LAST-MODIFIED:{{MOD}}
-DTSTAMP:{{STMP}}
-UID:{{UNICAL}}
-SUMMARY:{{SUMAR}}
-DTSTART;TZID=Europe/Berlin:{{ST}}
-DTEND;TZID=Europe/Berlin:{{END}}
-DESCRIPTION:{{DESC}}
-END:VEVENT
-END:VCALENDAR';
-    $created = $day->created_on;
-    $extra_data = $day->to_array();
-    $desc = $extra_data["description"];
-    $sumary = $extra_data["title"];
-    $st = $day->get_val('date')." ".$day->get_val('time').":00";
-    $end = $st;
-    $new_uid = "EPESIexportMeetings".$day->id;
-    $new_uid = str_replace(" ", "", $new_uid);
-    Utils_RecordBrowserCommon::update_record('crm_meeting', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
-    $st = $helper->toTimeCAL($st);
-    $end = $helper->toTimeCAL($end);
-    $created = $helper->toTimeCAL($created)."Z";
-    $event = $helper->change_data($event,'{{CR}}',$created);
-    $event = $helper->change_data($event,'{{MOD}}',$created);
-    $event = $helper->change_data($event,'{{STMP}}',$created);
-    $event = $helper->change_data($event,'{{UNICAL}}',$new_uid);
-    $event = $helper->change_data($event,'{{SUMAR}}',$sumary);
-    $event = $helper->change_data($event,'{{ST}}',$st);
-    $event = $helper->change_data($event,'{{END}}',$end); 
-    $event = $helper->change_data($event,'{{DESC}}',$desc); 
-    $create_new = $client->create($event);
-         
+        $user = $rbo->get_record($employer);
+        if($user->get_val('calendar_url') != ''){ 
+            $client->connect($user->get_val('calendar_url'), $login, $password);
+            $arrayOfCalendars = $client->findCalendars(); 
+            $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+            $event = $helper->change_data($event,'{{CR}}',$created);
+            $event = $helper->change_data($event,'{{MOD}}',$created);
+            $event = $helper->change_data($event,'{{STMP}}',$created);
+            $event = $helper->change_data($event,'{{UNICAL}}',$new_uid);
+            $event = $helper->change_data($event,'{{SUMAR}}',$sumary);
+            $event = $helper->change_data($event,'{{ST}}',$st);
+            $event = $helper->change_data($event,'{{END}}',$end); 
+            $event = $helper->change_data($event,'{{DESC}}',$desc); 
+            $create_new = $client->create($event);
         }
-        //for tasks 
-        $datetime = $date." 00:00:00";
-       $rboTask =  new RBO_RecordsetAccessor('task');
-       $get_days2 = $rboTask->get_records(array('created_by' => '1' , '>=deadline' => $date,'uid' => ''));
-       foreach($get_days2 as $day){
-        
+    }
+    Utils_RecordBrowserCommon::update_record('crm_meeting', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false); 
+ }
+    $datetime = $date." 00:00:00";
+    $rboTask =  new RBO_RecordsetAccessor('task');
+    $get_days2 = $rboTask->get_records(array('>=deadline' => $datetime,'uid' => ''));
+    foreach($get_days2 as $day){   
    $event = 'BEGIN:VCALENDAR
 PRODID:-//SomeExampleStuff//EN
 VERSION:2.0
@@ -179,7 +182,6 @@ DTEND;TZID=Europe/Berlin:{{END}}
 DESCRIPTION:{{DESC}}
 END:VEVENT
 END:VCALENDAR';
-   
     $created = $day->created_on;
     $data_extra = $day->to_array();
     $sumary = $data_extra["title"]; 
@@ -187,30 +189,35 @@ END:VCALENDAR';
     $desc = $data_extra["description"];
     $end = $st;
     $new_uid = "EPESIexportTasks".$day->id;
-    Utils_RecordBrowserCommon::update_record('task', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
     $st = $helper->toTimeCAL($st);
     $end = $helper->toTimeCAL($end);
     $created = $helper->toTimeCAL($created)."Z";
     $end = $st;
-    $event = $helper->change_data($event,'{{CR}}',$created);
-    $event = $helper->change_data($event,'{{MOD}}',$created);
-    $event = $helper->change_data($event,'{{STMP}}',$created);
-    $event = $helper->change_data($event,'{{UNICAL}}',$new_uid);
-    $event = $helper->change_data($event,'{{SUMAR}}',$sumary);
-    $event = $helper->change_data($event,'{{ST}}',$st);
-    $event = $helper->change_data($event,'{{END}}',$end); 
-    $event = $helper->change_data($event,'{{DESC}}',$desc); 
-    $create_new = $client->create($event);
-         }
-        
-        
-        
+    $employes = $data_extra["employees"];
+    foreach ($employes as $employer){
+        $user = $rbo->get_record($employer);
+        if($user->get_val('calendar_url') != ''){ 
+            $client->connect($user->get_val('calendar_url'), $login, $password);
+            $arrayOfCalendars = $client->findCalendars(); 
+            $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+            $event = $helper->change_data($event,'{{CR}}',$created);
+            $event = $helper->change_data($event,'{{MOD}}',$created);
+            $event = $helper->change_data($event,'{{STMP}}',$created);
+            $event = $helper->change_data($event,'{{UNICAL}}',$new_uid);
+            $event = $helper->change_data($event,'{{SUMAR}}',$sumary);
+            $event = $helper->change_data($event,'{{ST}}',$st);
+            $event = $helper->change_data($event,'{{END}}',$end); 
+            $event = $helper->change_data($event,'{{DESC}}',$desc); 
+            $create_new = $client->create($event);
+        }
+    }
+     Utils_RecordBrowserCommon::update_record('task', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
+ }
         //for phonecalls
-  
-   $rboPhone =  new RBO_RecordsetAccessor('phonecall');
-   $get_days3 = $rboPhone->get_records(array('created_by' => $user->id , '>=date_and_time' => $date,'uid' => ''));
-   foreach($get_days3 as $day){
-   $event = 'BEGIN:VCALENDAR
+    $rboPhone =  new RBO_RecordsetAccessor('phonecall');
+    $get_days3 = $rboPhone->get_records(array('>=date_and_time' => $datetime,'uid' => ''));
+    foreach($get_days3 as $day){
+    $event = 'BEGIN:VCALENDAR
 PRODID:-//SomeExampleStuff//EN
 VERSION:2.0
 BEGIN:VTIMEZONE
@@ -249,14 +256,12 @@ END:VCALENDAR';
    $desc = $data_extra['description'];// $query[$l]["f_description"];
    $end = $st;
    $phonenumber = $data_extra["other_phone_number"];
-   if($phonenumber == ""){
-      
+   if($phonenumber == ""){ 
        $klient = $data_extra["customer"];
        $klient = explode("/", $klient);
        $number = $klient[1];
        $number = intval($number);
        $klient = $klient[0];
-      // Base_StatusBarCommon::message($number.$klient);
        if($klient == 'contact'){
            $rb = new RBO_RecordsetAccessor('contact');
            $x = $rb->get_record($number);
@@ -268,31 +273,34 @@ END:VCALENDAR';
            $rb = new RBO_RecordsetAccessor('company');
            $x = $rb->get_record($number);
            $phonenumber =  $x->get_val('phone'); 
-       }
-   }
-        $new_uid = "EPESIexportPhones".$day->id;
-   
-        $new_uid = str_replace(" ", "", $new_uid);
-        Utils_RecordBrowserCommon::update_record('phonecall', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
-        $sumary = $sumary." \n  TEL: ".$phonenumber;
-        $st = $helper->toTimeCAL($st);
-        $end = $helper->toTimeCAL($end);
-        $created = $helper->toTimeCAL($created)."Z";
-        $event = $helper->change_data($event,'{{CR}}',$created);
-        $event = $helper->change_data($event,'{{MOD}}',$created);
-        $event = $helper->change_data($event,'{{STMP}}',$created);
-        $event = $helper->change_data($event,'{{UNICAL}}',$new_uid);
-        $event = $helper->change_data($event,'{{SUMAR}}',$sumary);
-        $event = $helper->change_data($event,'{{ST}}',$st);
-        $event = $helper->change_data($event,'{{END}}',$end); 
-        $event = $helper->change_data($event,'{{DESC}}',$desc); 
-        $create_new = $client->create($event);
-         }
-        
-        
-      }  
+            }
     }
-
-  
+    $new_uid = "EPESIexportPhones".$day->id;
+    $new_uid = str_replace(" ", "", $new_uid);
+    $sumary = $sumary." \n  TEL: ".$phonenumber;
+    $st = $helper->toTimeCAL($st);
+    $end = $helper->toTimeCAL($end);
+    $created = $helper->toTimeCAL($created)."Z";
+    $employes = $data_extra["employees"];
+    foreach ($employes as $employer){
+        $user = $rbo->get_record($employer);
+        if($user->get_val('calendar_url') != ''){ 
+            $client = new SimpleCalDAVClient();
+            $client->connect($user->get_val('calendar_url'), $login, $password);
+            $arrayOfCalendars = $client->findCalendars(); 
+            $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+            $event = $helper->change_data($event,'{{CR}}',$created);
+            $event = $helper->change_data($event,'{{MOD}}',$created);
+            $event = $helper->change_data($event,'{{STMP}}',$created);
+            $event = $helper->change_data($event,'{{UNICAL}}',$new_uid);
+            $event = $helper->change_data($event,'{{SUMAR}}',$sumary);
+            $event = $helper->change_data($event,'{{ST}}',$st);
+            $event = $helper->change_data($event,'{{END}}',$end); 
+            $event = $helper->change_data($event,'{{DESC}}',$desc); 
+            $create_new = $client->create($event);
+        }
+    }
+    Utils_RecordBrowserCommon::update_record('phonecall', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
+   }
+  }
 }
-

@@ -209,7 +209,6 @@ END:VCALENDAR';
   
    $rboPhone =  new RBO_RecordsetAccessor('phonecall');
    $get_days3 = $rboPhone->get_records(array('created_by' => $user->id , '>=date_and_time' => $date,'uid' => ''));
-        //for meetings
    foreach($get_days3 as $day){
    $event = 'BEGIN:VCALENDAR
 PRODID:-//SomeExampleStuff//EN
@@ -243,7 +242,6 @@ DTEND;TZID=Europe/Berlin:{{END}}
 DESCRIPTION:{{DESC}}
 END:VEVENT
 END:VCALENDAR';
-   //if f_related != null 
    $data_extra = $day->to_array();
    $created =  $day->created_on;// $query[$l]["created_on"];
    $sumary = $data_extra['subject'];// $query[$l]["f_subject"];
@@ -275,7 +273,6 @@ END:VCALENDAR';
         $new_uid = "EPESIexportPhones".$day->id;
    
         $new_uid = str_replace(" ", "", $new_uid);
-          //DB::Execute("UPDATE public.phonecall_data_1 SET f_related = '".$new_uid."' WHERE ID = ".$query[$l]["id"]);
         Utils_RecordBrowserCommon::update_record('phonecall', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
         $sumary = $sumary." \n  TEL: ".$phonenumber;
         $st = $helper->toTimeCAL($st);

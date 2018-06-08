@@ -206,9 +206,11 @@ END:VCALENDAR';
         
         
         //for phonecalls
-       $rboPhone =  new RBO_RecordsetAccessor('phonecall');
-       $get_days3 = $rboPhone->get_records(array('created_by' => '1' , '>=date_and_time' => $date,'uid' => ''));
-       foreach($get_days3 as $day){
+  
+   $rboPhone =  new RBO_RecordsetAccessor('phonecall');
+   $get_days3 = $rboPhone->get_records(array('created_by' => $user->id , '>=date_and_time' => $date,'uid' => ''));
+        //for meetings
+   foreach($get_days3 as $day){
    $event = 'BEGIN:VCALENDAR
 PRODID:-//SomeExampleStuff//EN
 VERSION:2.0
@@ -256,36 +258,40 @@ END:VCALENDAR';
        $number = $klient[1];
        $number = intval($number);
        $klient = $klient[0];
+      // Base_StatusBarCommon::message($number.$klient);
        if($klient == 'contact'){
            $rb = new RBO_RecordsetAccessor('contact');
-           $get = $rb->get_record($number);
-           $phonenumber = $get->get_val('work_phone');
+           $x = $rb->get_record($number);
+           $phonenumber = $x->get_val('work_phone');
            if ($phonenumber == ""){
-               $phonenumber = $get->get_val("mobile_phone");
+               $phonenumber = $x->get_val("mobile_phone");
            }
        }else{
            $rb = new RBO_RecordsetAccessor('company');
-           $get = $rb->get_record($number);
-           $phonenumber =  $get->get_val('phone'); 
+           $x = $rb->get_record($number);
+           $phonenumber =  $x->get_val('phone'); 
        }
    }
-    $new_uid = "EPESIexportPhones".$day->id;
-    $new_uid = str_replace(" ", "", $new_uid);
-    Utils_RecordBrowserCommon::update_record('phonecall', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
-    $sumary = $sumary." \n  TEL: ".$phonenumber;
-    $st = $helper->toTimeCAL($st);
-    $end = $helper->toTimeCAL($end);
-    $created = $helper->toTimeCAL($created)."Z";
-    $event = $helper->change_data($event,'{{CR}}',$created);
-    $event = $helper->change_data($event,'{{MOD}}',$created);
-    $event = $helper->change_data($event,'{{STMP}}',$created);
-    $event = $helper->change_data($event,'{{UNICAL}}',$new_uid);
-    $event = $helper->change_data($event,'{{SUMAR}}',$sumary);
-    $event = $helper->change_data($event,'{{ST}}',$st);
-    $event = $helper->change_data($event,'{{END}}',$end); 
-    $event = $helper->change_data($event,'{{DESC}}',$desc); 
-    $create_new = $client->create($event);
+        $new_uid = "EPESIexportPhones".$day->id;
+   
+        $new_uid = str_replace(" ", "", $new_uid);
+          //DB::Execute("UPDATE public.phonecall_data_1 SET f_related = '".$new_uid."' WHERE ID = ".$query[$l]["id"]);
+        Utils_RecordBrowserCommon::update_record('phonecall', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
+        $sumary = $sumary." \n  TEL: ".$phonenumber;
+        $st = $helper->toTimeCAL($st);
+        $end = $helper->toTimeCAL($end);
+        $created = $helper->toTimeCAL($created)."Z";
+        $event = $helper->change_data($event,'{{CR}}',$created);
+        $event = $helper->change_data($event,'{{MOD}}',$created);
+        $event = $helper->change_data($event,'{{STMP}}',$created);
+        $event = $helper->change_data($event,'{{UNICAL}}',$new_uid);
+        $event = $helper->change_data($event,'{{SUMAR}}',$sumary);
+        $event = $helper->change_data($event,'{{ST}}',$st);
+        $event = $helper->change_data($event,'{{END}}',$end); 
+        $event = $helper->change_data($event,'{{DESC}}',$desc); 
+        $create_new = $client->create($event);
          }
+        
         
       }  
     }

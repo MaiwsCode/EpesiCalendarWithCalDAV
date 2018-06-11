@@ -135,13 +135,13 @@ END:VCALENDAR';
    }
    if($end == null){
        $end = $extra_data['duration'];  
+       $end = $helper->calc_duration($st, $end);
        $st = $helper->toTimeCAL($st);
-       $end = $helper->toTimeCAL($st, $end);
    }
    $new_uid = "EPESIexportMeetings".$day->id;
    $new_uid = str_replace(" ", "", $new_uid);
-   $st = $helper->toTimeCAL($st);
-   $end = $helper->toTimeCAL($end);
+  // $st = $helper->toTimeCAL($st);
+  // $end = $helper->toTimeCAL($end);
    $created = $helper->toTimeCAL($created)."Z";
    $employes = $extra_data["employees"];
    foreach ($employes as $employer ){

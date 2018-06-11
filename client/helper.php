@@ -64,18 +64,16 @@ public static function convert_date_time($date){
           
       }
       
-    public static function toTimeCAL($input_date,$duration){       
-         if($duration){
-            $timestamp = strtotime($input_date);
-            $timestamp = $timestamp + $duration;
-            $date = date("Ymd\THis",$timestamp);
-            
-         }
-         else{
-            $timestamp = strtotime($input_date);
-            $date = date("Ymd\THis",$timestamp);
-         }
+    public static function toTimeCAL($input_date){       
+         $timestamp = strtotime($input_date);
+         $date = date("Ymd\THis",$timestamp);
          return $date;  
          
      }
+    public static function calc_duration($input_date,$duration) {
+        $timestamp = strtotime($input_date);
+        $timestamp = $timestamp + $duration;
+        $date = date("Ymd\THis",$timestamp);
+        return $date;    
+    }
 }

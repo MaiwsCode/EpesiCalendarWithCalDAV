@@ -28,7 +28,7 @@ class iCalSyncCommon extends ModuleCommon {
            'push_events' => 4
         );
     }
-     // SERVER  -> EPESI
+     // SERVER -> EPESI
     public static function update() {
           $helper = new helper();
           $rbo = new RBO_RecordsetAccessor('contact');
@@ -125,9 +125,19 @@ END:VCALENDAR';
    $created = $day->created_on;
    $extra_data = $day->to_array();
    $desc = $extra_data["description"];
-   $sumary = $extra_data["title"];
-   $st = $day->get_val('date')." ".$day->get_val('time').":00";
-   $end = $st;   
+   $st = $day['time'];
+   $end = null;
+   if($st == null){
+       $st = $day['date']." 00:00:00";
+       $end = $day['date']." 23:59:59";
+       $st = $helper->toTimeCAL($st);
+       $end = $helper->toTimeCAL($end);
+   }
+   if($end == null){
+       $end = $extra_data['duration'];  
+       $st = $helper->toTimeCAL($st);
+       $end = $helper->toTimeCAL($st, $end);
+   }
    $new_uid = "EPESIexportMeetings".$day->id;
    $new_uid = str_replace(" ", "", $new_uid);
    $st = $helper->toTimeCAL($st);
@@ -193,7 +203,7 @@ END:VCALENDAR';
     $created = $day->created_on;
     $data_extra = $day->to_array();
     $sumary = $data_extra["title"]; 
-    $st = $data_extra['deadline']; 
+    $st = $day['deadline']; 
     $desc = $data_extra["description"];
     $end = $st;
     $new_uid = "EPESIexportTasks".$day->id;

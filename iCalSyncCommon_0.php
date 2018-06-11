@@ -125,6 +125,7 @@ END:VCALENDAR';
    $created = $day->created_on;
    $extra_data = $day->to_array();
    $desc = $extra_data["description"];
+   $sumary = $extra_data["title"];
    $st = $day['time'];
    $end = null;
    if($st == null){

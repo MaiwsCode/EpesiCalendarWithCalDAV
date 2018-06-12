@@ -8,6 +8,17 @@ require 'client/CalDAVException.php';
 require 'client/SimpleCalDAVClient.php';
 require 'client/class.iCalReader.php';
 require 'client/helper.php';
+
+class Connetion_data  {
+    public static function login(){
+        $login = "your_login";
+        return $login;
+    }
+    public static function password(){
+        $password = "your_password";
+        return $password;  
+    }  
+}
 class iCalSyncCommon extends ModuleCommon {
 
 
@@ -17,15 +28,14 @@ class iCalSyncCommon extends ModuleCommon {
            'push_events' => 4
         );
     }
-     // SERVER  -> EPESI
+     // SERVER -> EPESI
     public static function update() {
-         $helper = new helper();
-          $login = "your_login";
-          $password = "your_password";
+          $helper = new helper();
           $rbo = new RBO_RecordsetAccessor('contact');
           $users_urls = $rbo->get_records(array('!calendar_url' => ''));
           foreach($users_urls as $user ){      
-          $client = new CalDAVClient($user->get_val('calendar_url'),$login,$password);
+          $Connetion_data = "Connetion_data";
+          $client = new CalDAVClient($user->get_val('calendar_url'), Connetion_data::login(),Connetion_data::password());
           $start = $helper->get_date();
           $result = $client->GetEvents($start);
           for( $i = 0; $i < count($result); $i++) {
@@ -69,9 +79,7 @@ class iCalSyncCommon extends ModuleCommon {
     }
     // EPESI EVENTS --> SERVER
  public static function push_events(){
-     $helper = new helper();
-    $login = "your_login";
-    $password = "your_password";
+    $helper = new helper();
     $date = date_create(date('Y-m-d'));
     date_sub($date, date_interval_create_from_date_string('14 days'));
     $date =  date_format($date, 'Y-m-d');
@@ -116,21 +124,33 @@ END:VCALENDAR';
    //if f_related != null 
    $created = $day->created_on;
    $extra_data = $day->to_array();
-   $desc = $extra_data["description"];
+   $desc = $day->get_val('description');
+   $desc = str_replace("<br>", "  ", $desc);
    $sumary = $extra_data["title"];
-   $st = $day->get_val('date')." ".$day->get_val('time').":00";
-   $end = $st;   
+   $st = $day['time'];
+   $end = null;
+   if($st == null){
+       $st = $day['date']." 00:00:00";
+       $end = $day['date']." 23:59:59";
+       $st = $helper->toTimeCAL($st);
+       $end = $helper->toTimeCAL($end);
+   }
+   if($end == null){
+       $end = $extra_data['duration'];  
+       $end = $helper->calc_duration($st, $end);
+       $st = $helper->toTimeCAL($st);
+   }
    $new_uid = "EPESIexportMeetings".$day->id;
    $new_uid = str_replace(" ", "", $new_uid);
-   $st = $helper->toTimeCAL($st);
-   $end = $helper->toTimeCAL($end);
+  // $st = $helper->toTimeCAL($st);
+  // $end = $helper->toTimeCAL($end);
    $created = $helper->toTimeCAL($created)."Z";
    $employes = $extra_data["employees"];
    foreach ($employes as $employer ){
         $rbo = new RBO_RecordsetAccessor('contact');
         $user = $rbo->get_record($employer);
         if($user->get_val('calendar_url') != ''){ 
-            $client->connect($user->get_val('calendar_url'), $login, $password);
+            $client->connect($user->get_val('calendar_url'), Connetion_data::login(),Connetion_data::password());
             $arrayOfCalendars = $client->findCalendars(); 
             $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
             $event = $helper->change_data($event,'{{CR}}',$created);
@@ -185,8 +205,9 @@ END:VCALENDAR';
     $created = $day->created_on;
     $data_extra = $day->to_array();
     $sumary = $data_extra["title"]; 
-    $st = $data_extra['deadline']; 
-    $desc = $data_extra["description"];
+    $st = $day['deadline']; 
+    $desc = $day->get_val('description');
+    $desc = str_replace("<br>", "  ", $desc);
     $end = $st;
     $new_uid = "EPESIexportTasks".$day->id;
     $st = $helper->toTimeCAL($st);
@@ -197,7 +218,7 @@ END:VCALENDAR';
     foreach ($employes as $employer){
         $user = $rbo->get_record($employer);
         if($user->get_val('calendar_url') != ''){ 
-            $client->connect($user->get_val('calendar_url'), $login, $password);
+            $client->connect($user->get_val('calendar_url'),Connetion_data::login(),Connetion_data::password());
             $arrayOfCalendars = $client->findCalendars(); 
             $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
             $event = $helper->change_data($event,'{{CR}}',$created);
@@ -253,7 +274,8 @@ END:VCALENDAR';
    $created =  $day->created_on;// $query[$l]["created_on"];
    $sumary = $data_extra['subject'];// $query[$l]["f_subject"];
    $st = $day->get_val('date_and_time');// $query[$l]["f_date_and_time"];
-   $desc = $data_extra['description'];// $query[$l]["f_description"];
+   $desc = $day->get_val('description');
+   $desc = str_replace("<br>", "  ", $desc);
    $end = $st;
    $phonenumber = $data_extra["other_phone_number"];
    if($phonenumber == ""){ 
@@ -286,7 +308,7 @@ END:VCALENDAR';
         $user = $rbo->get_record($employer);
         if($user->get_val('calendar_url') != ''){ 
             $client = new SimpleCalDAVClient();
-            $client->connect($user->get_val('calendar_url'), $login, $password);
+            $client->connect($user->get_val('calendar_url'), Connetion_data::login(),Connetion_data::password());
             $arrayOfCalendars = $client->findCalendars(); 
             $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
             $event = $helper->change_data($event,'{{CR}}',$created);

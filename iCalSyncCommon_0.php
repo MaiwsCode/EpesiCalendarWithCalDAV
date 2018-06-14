@@ -9,7 +9,6 @@ require 'client/SimpleCalDAVClient.php';
 require 'client/class.iCalReader.php';
 require 'client/helper.php';
 
-
 class iCalSyncCommon extends ModuleCommon {
 
 
@@ -101,14 +100,14 @@ BEGIN:VTIMEZONE
 TZID:Europe/Warsaw
 X-LIC-LOCATION:Europe/Warsaw
 BEGIN:DAYLIGHT
-TZOFFSETFROM:+0200
-TZOFFSETTO:+0100
+TZOFFSETFROM:+0000
+TZOFFSETTO:+0200
 TZNAME:CEST
 DTSTART:19700329T020000
 RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3
 END:DAYLIGHT
 BEGIN:STANDARD
-TZOFFSETFROM:+0100
+TZOFFSETFROM:+0000
 TZOFFSETTO:+0200
 TZNAME:CEST
 DTSTART:19701025T030000
@@ -121,8 +120,8 @@ LAST-MODIFIED:{{MOD}}
 DTSTAMP:{{STMP}}
 UID:{{UNICAL}}
 SUMMARY:{{SUMAR}}
-DTSTART;TZID=Europe/Warsaw:{{ST}}
-DTEND;TZID=Europe/Warsaw:{{END}}
+DTSTART:{{ST}}
+DTEND:{{END}}
 CLASS:{{STATUS}}
 DESCRIPTION:{{DESC}}
 END:VEVENT
@@ -131,7 +130,7 @@ END:VCALENDAR';
         $created = $day->created_on;
         $extra_data = $day->to_array();
         $desc = $day->get_val('description');
-        $desc = str_replace("<br>", "  ", $desc);
+     //   $desc = str_replace("<br>", "  ", $desc);
         $sumary = $extra_data["title"];
         $st = $day['time'];
         $end = null;
@@ -160,16 +159,7 @@ END:VCALENDAR';
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-                $event = $helper->change_data($event,'{{CR}}',$created);
-                $event = $helper->change_data($event,'{{MOD}}',$created);
-                $event = $helper->change_data($event,'{{STMP}}',$created);
-                $event = $helper->change_data($event,'{{UNICAL}}',$new_uid);
-                $event = $helper->change_data($event,'{{SUMAR}}',$sumary);
-                $event = $helper->change_data($event,'{{ST}}',$st);
-                $event = $helper->change_data($event,'{{END}}',$end); 
-                $event = $helper->change_data($event,'{{DESC}}',$desc);
-                $event = $helper->change_data($event,'{{STATUS}}',$status);
-                $create_new = $client->create($event);
+                $create_new = $client->create(helper::export($sumary,$desc, $day['time'], $day['time'],$new_uid));
             }
         }
         Utils_RecordBrowserCommon::update_record('crm_meeting', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false); 
@@ -185,14 +175,14 @@ BEGIN:VTIMEZONE
 TZID:Europe/Warsaw
 X-LIC-LOCATION:Europe/Warsaw
 BEGIN:DAYLIGHT
-TZOFFSETFROM:+0200
-TZOFFSETTO:+0100
+TZOFFSETFROM:+0000
+TZOFFSETTO:+0200
 TZNAME:CEST
 DTSTART:19700329T020000
 RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3
 END:DAYLIGHT
 BEGIN:STANDARD
-TZOFFSETFROM:+0100
+TZOFFSETFROM:+0000
 TZOFFSETTO:+0200
 TZNAME:CEST
 DTSTART:19701025T030000
@@ -205,8 +195,8 @@ LAST-MODIFIED:{{MOD}}
 DTSTAMP:{{STMP}}
 UID:{{UNICAL}}
 SUMMARY:{{SUMAR}}
-DTSTART;TZID=Europe/Warsaw:{{ST}}
-DTEND;TZID=Europe/Warsaw:{{END}}
+DTSTART;TZID=Europe/Warsaw:{{ST}}+0200
+DTEND;TZID=Europe/Warsaw:{{END}}+0200
 CLASS:{{STATUS}}
 DESCRIPTION:{{DESC}}
 END:VEVENT
@@ -244,16 +234,7 @@ END:VCALENDAR';
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-                $event = $helper->change_data($event,'{{CR}}',$created);
-                $event = $helper->change_data($event,'{{MOD}}',$created);
-                $event = $helper->change_data($event,'{{STMP}}',$created);
-                $event = $helper->change_data($event,'{{UNICAL}}',$new_uid);
-                $event = $helper->change_data($event,'{{SUMAR}}',$sumary);
-                $event = $helper->change_data($event,'{{ST}}',$st);
-                $event = $helper->change_data($event,'{{END}}',$end); 
-                $event = $helper->change_data($event,'{{DESC}}',$desc); 
-                $event = $helper->change_data($event,'{{STATUS}}',$status);
-                $create_new = $client->create($event);
+                $create_new = $client->create(helper::export($sumary,$desc, $day['deadline'], $day['deadline'],$new_uid));
             }
         }
        Utils_RecordBrowserCommon::update_record('task', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
@@ -269,14 +250,14 @@ BEGIN:VTIMEZONE
 TZID:Europe/Warsaw
 X-LIC-LOCATION:Europe/Warsaw
 BEGIN:DAYLIGHT
-TZOFFSETFROM:+0200
-TZOFFSETTO:+0100
+TZOFFSETFROM:+0000
+TZOFFSETTO:+0200
 TZNAME:CEST
 DTSTART:19700329T020000
 RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3
 END:DAYLIGHT
 BEGIN:STANDARD
-TZOFFSETFROM:+0100
+TZOFFSETFROM:+0000
 TZOFFSETTO:+0200
 TZNAME:CEST
 DTSTART:19701025T030000
@@ -336,19 +317,11 @@ END:VCALENDAR';
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-                $event = $helper->change_data($event,'{{CR}}',$created);
-                $event = $helper->change_data($event,'{{MOD}}',$created);
-                $event = $helper->change_data($event,'{{STMP}}',$created);
-                $event = $helper->change_data($event,'{{UNICAL}}',$new_uid);
-                $event = $helper->change_data($event,'{{SUMAR}}',$sumary);
-                $event = $helper->change_data($event,'{{ST}}',$st);
-                $event = $helper->change_data($event,'{{END}}',$end); 
-                $event = $helper->change_data($event,'{{DESC}}',$desc); 
-                $event = $helper->change_data($event,'{{STATUS}}',$status);
-                $create_new = $client->create($event);
+                $create_new = $client->create(helper::export($sumary,$desc, $day['date_and_time'], $day['date_and_time'],$new_uid));
             }
         }
         Utils_RecordBrowserCommon::update_record('phonecall', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
     }
   }
+  
 }

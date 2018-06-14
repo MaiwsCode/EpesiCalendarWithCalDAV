@@ -5,7 +5,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-
+require 'zapcallib.php';
 class helper {
 
     public static function get_date(){
@@ -123,4 +123,38 @@ class helper {
         $date = date("Ymd\THis",$timestamp);
         return $date;    
     }
+    public static function export($title,$description,$date_start,$date_stop,$uid){
+        // date/time is in SQL datetime format
+        $event_start = $date_start;
+        $event_end = $date_stop;
+        
+        // create the ical object
+        $icalobj = new ZCiCal();
+        
+        // create the event within the ical object
+        $eventobj = new ZCiCalNode("VEVENT", $icalobj->curnode);
+        
+        // add title
+        $eventobj->addNode(new ZCiCalDataNode("SUMMARY:" . $title));
+        
+        // add start date
+        $eventobj->addNode(new ZCiCalDataNode("DTSTART:" . ZCiCal::fromSqlDateTime($event_start)));
+        
+        // add end date
+        $eventobj->addNode(new ZCiCalDataNode("DTEND:" . ZCiCal::fromSqlDateTime($event_end)));
+        
+        // UID is a required item in VEVENT, create unique string for this event
+        // Adding your domain to the end is a good way of creating uniqueness
+        $eventobj->addNode(new ZCiCalDataNode("UID:" .$uid));
+        
+        // DTSTAMP is a required item in VEVENT
+        $eventobj->addNode(new ZCiCalDataNode("DTSTAMP:" . ZCiCal::fromSqlDateTime()));
+        
+        // Add description
+        $eventobj->addNode(new ZCiCalDataNode("Description:" . ZCiCal::formatContent($description)));
+        
+        // write iCalendar feed to stdout
+        return $icalobj->export();
+    
+      }
 }

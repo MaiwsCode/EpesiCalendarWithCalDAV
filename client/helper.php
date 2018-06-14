@@ -109,12 +109,12 @@ class helper {
 
     public static function toDateCAL($input_date){       
          $timestamp = strtotime($input_date);
-         $date = date("Ymd",$timestamp);
+         $date = date("Y-m-d",$timestamp);
          return $date;  
     }
     public static function toDateTimeCAL($input_date){       
          $timestamp = strtotime($input_date);
-         $date = date("Ymd\THis",$timestamp);
+         $date = date("Y-m-d H:i:s",$timestamp);
          return $date;  
     }
     public static function calc_duration($input_date,$duration) {
@@ -123,7 +123,7 @@ class helper {
         $date = date("Ymd\THis",$timestamp);
         return $date;    
     }
-    public static function export($title,$description,$date_start,$date_stop,$uid){
+    public static function export($title,$description,$date_start,$date_stop,$uid,$status){
         // date/time is in SQL datetime format
         $event_start = $date_start;
         $event_end = $date_stop;
@@ -136,7 +136,7 @@ class helper {
         
         // add title
         $eventobj->addNode(new ZCiCalDataNode("SUMMARY:" . $title));
-        
+        $eventobj->addNode(new ZCiCalDataNode("CLASS:" . $status));
         // add start date
         $eventobj->addNode(new ZCiCalDataNode("DTSTART:" . ZCiCal::fromSqlDateTime($event_start)));
         

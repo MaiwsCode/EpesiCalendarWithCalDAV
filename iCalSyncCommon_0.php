@@ -93,40 +93,6 @@ class iCalSyncCommon extends ModuleCommon {
         $get_days = $rbo_meet->get_records(array('>=date' => $date,'uid' => ''));
         //for meetings
         foreach($get_days as $day){   
-   $event = 'BEGIN:VCALENDAR
-PRODID:-//SomeExampleStuff//EN
-VERSION:2.0
-BEGIN:VTIMEZONE
-TZID:Europe/Warsaw
-X-LIC-LOCATION:Europe/Warsaw
-BEGIN:DAYLIGHT
-TZOFFSETFROM:+0000
-TZOFFSETTO:+0200
-TZNAME:CEST
-DTSTART:19700329T020000
-RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3
-END:DAYLIGHT
-BEGIN:STANDARD
-TZOFFSETFROM:+0000
-TZOFFSETTO:+0200
-TZNAME:CEST
-DTSTART:19701025T030000
-RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10
-END:STANDARD
-END:VTIMEZONE
-BEGIN:VEVENT
-CREATED:{{CR}}
-LAST-MODIFIED:{{MOD}}
-DTSTAMP:{{STMP}}
-UID:{{UNICAL}}
-SUMMARY:{{SUMAR}}
-DTSTART:{{ST}}
-DTEND:{{END}}
-CLASS:{{STATUS}}
-DESCRIPTION:{{DESC}}
-END:VEVENT
-END:VCALENDAR';
-   //if f_related != null 
         $created = $day->created_on;
         $extra_data = $day->to_array();
         $desc = $day->get_val('description');
@@ -136,15 +102,12 @@ END:VCALENDAR';
         $end = null;
         if($st == null){
             $st = $day['date'];
-            $timestamp = strtotime($st);
-            $timestamp = $timestamp + 86401;
-            $end = date("Ymd",$timestamp);
-            $st = $helper->toDateCAL($st);
+            $end = $day['date'];
         }
         if($end == null){
             $end = $extra_data['duration'];  
-            $end = $helper->calc_duration($st, $end);
-            $st = $helper->toDateTimeCAL($st);
+            $time = $helper->calc_duration($st, $end);
+            $end = $helper->toDateTimeCAL($time);
         }
         $new_uid = "EPESIexportMeetings".$day->id;
         $new_uid = str_replace(" ", "", $new_uid);
@@ -159,7 +122,7 @@ END:VCALENDAR';
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-                $create_new = $client->create(helper::export($sumary,$desc, $day['time'], $day['time'],$new_uid));
+                $create_new = $client->create(helper::export($sumary,$desc, $st, $end,$new_uid,$status));
             }
         }
         Utils_RecordBrowserCommon::update_record('crm_meeting', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false); 
@@ -168,61 +131,20 @@ END:VCALENDAR';
         $rboTask =  new RBO_RecordsetAccessor('task');
         $get_days2 = $rboTask->get_records(array('>=deadline' => $datetime,'uid' => ''));
         foreach($get_days2 as $day){   
-    $event = 'BEGIN:VCALENDAR
-PRODID:-//SomeExampleStuff//EN
-VERSION:2.0
-BEGIN:VTIMEZONE
-TZID:Europe/Warsaw
-X-LIC-LOCATION:Europe/Warsaw
-BEGIN:DAYLIGHT
-TZOFFSETFROM:+0000
-TZOFFSETTO:+0200
-TZNAME:CEST
-DTSTART:19700329T020000
-RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3
-END:DAYLIGHT
-BEGIN:STANDARD
-TZOFFSETFROM:+0000
-TZOFFSETTO:+0200
-TZNAME:CEST
-DTSTART:19701025T030000
-RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10
-END:STANDARD
-END:VTIMEZONE
-BEGIN:VEVENT
-CREATED:{{CR}}
-LAST-MODIFIED:{{MOD}}
-DTSTAMP:{{STMP}}
-UID:{{UNICAL}}
-SUMMARY:{{SUMAR}}
-DTSTART;TZID=Europe/Warsaw:{{ST}}+0200
-DTEND;TZID=Europe/Warsaw:{{END}}+0200
-CLASS:{{STATUS}}
-DESCRIPTION:{{DESC}}
-END:VEVENT
-END:VCALENDAR';
         $created = $day->created_on;
         $data_extra = $day->to_array();
         $sumary = $data_extra["title"]; 
         $st = $day['deadline']; 
         $desc = $day->get_val('description');
-        $desc = str_replace("<br>", "  ", $desc);
+      //  $desc = str_replace("<br>", "  ", $desc);
         $end = $st;
         $new_uid = "EPESIexportTasks".$day->id;
-        
         if($day['timeless'] == '1'){
-            print("BEZ H");
-            $st = $day['deadline'];
-            $timestamp = strtotime($st);
-            $timestamp = $timestamp;
-            $st = date("Ymd",$timestamp);
             $time = $day['deadline'];
-            $timestamp = strtotime($time);
-            $timestamp = $timestamp + 86401;
-            $end = date("Ymd",$timestamp);
+            $time = $helper->toDateCAL($time);
         }else{
-            $st = $helper->toDateTimeCAL($st);
-            $end = $helper->toDateTimeCAL($end);
+           $time = $day['deadline'];
+           
         }
         $created = $helper->toDateTimeCAL($created)."Z";
         $status = $data_extra['permission'];
@@ -234,7 +156,7 @@ END:VCALENDAR';
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-                $create_new = $client->create(helper::export($sumary,$desc, $day['deadline'], $day['deadline'],$new_uid));
+                $create_new = $client->create(helper::export($sumary,$desc, $time, $time,$new_uid,$status));
             }
         }
        Utils_RecordBrowserCommon::update_record('task', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
@@ -243,45 +165,12 @@ END:VCALENDAR';
         $rboPhone =  new RBO_RecordsetAccessor('phonecall');
         $get_days3 = $rboPhone->get_records(array('>=date_and_time' => $datetime,'uid' => ''));
         foreach($get_days3 as $day){
-    $event = 'BEGIN:VCALENDAR
-PRODID:-//SomeExampleStuff//EN
-VERSION:2.0
-BEGIN:VTIMEZONE
-TZID:Europe/Warsaw
-X-LIC-LOCATION:Europe/Warsaw
-BEGIN:DAYLIGHT
-TZOFFSETFROM:+0000
-TZOFFSETTO:+0200
-TZNAME:CEST
-DTSTART:19700329T020000
-RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3
-END:DAYLIGHT
-BEGIN:STANDARD
-TZOFFSETFROM:+0000
-TZOFFSETTO:+0200
-TZNAME:CEST
-DTSTART:19701025T030000
-RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10
-END:STANDARD
-END:VTIMEZONE
-BEGIN:VEVENT
-CREATED:{{CR}}
-LAST-MODIFIED:{{MOD}}
-DTSTAMP:{{STMP}}
-UID:{{UNICAL}}
-SUMMARY:{{SUMAR}}
-DTSTART;TZID=Europe/Warsaw:{{ST}}
-DTEND;TZID=Europe/Warsaw:{{END}}
-CLASS:{{STATUS}}
-DESCRIPTION:{{DESC}}
-END:VEVENT
-END:VCALENDAR';
         $data_extra = $day->to_array();
         $created =  $day->created_on;// $query[$l]["created_on"];
         $sumary = $data_extra['subject'];// $query[$l]["f_subject"];
         $st = $day['date_and_time'];// $query[$l]["f_date_and_time"];
         $desc = $day->get_val('description');
-        $desc = str_replace("<br>", "  ", $desc);
+       // $desc = str_replace("<br>", "  ", $desc);
         $end = $st;
         $phonenumber = $data_extra["other_phone_number"];
         if($phonenumber == ""){ 
@@ -317,7 +206,7 @@ END:VCALENDAR';
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-                $create_new = $client->create(helper::export($sumary,$desc, $day['date_and_time'], $day['date_and_time'],$new_uid));
+                $create_new = $client->create(helper::export($sumary,$desc, $day['date_and_time'], $day['date_and_time'],$new_uid,$status));
             }
         }
         Utils_RecordBrowserCommon::update_record('phonecall', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);

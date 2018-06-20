@@ -6,6 +6,9 @@ class iCalSyncInstall extends ModuleInstall {
 	public function install() {
 // Here you can place installation process for the module
 		$ret = true;
+		Utils_RecordBrowserCommon::register_processing_callback('crm_meeting', array($this->get_type () . 'Common', 'on_action_meeting'));
+		Utils_RecordBrowserCommon::register_processing_callback('phonecall', array($this->get_type () . 'Common', 'on_action_phonecall'));
+		Utils_RecordBrowserCommon::register_processing_callback('task', array($this->get_type () . 'Common', 'on_action_task'));
             //    DB::Execute('CREATE TABLE public.users_calendar("ID" integer NOT NULL DEFAULT nextval("users_calendar_ID_seq"::regclass),user_id integer,adress_url text COLLATE pg_catalog."default",CONSTRAINT users_calendar_pkey PRIMARY KEY ("ID"))');
 		//Utils_RecordBrowserCommon::register_processing_callback('crm_calendar',array('iCalSyncCommon','add_action_bar'));
 		return $ret; // Return false on success and false on failure

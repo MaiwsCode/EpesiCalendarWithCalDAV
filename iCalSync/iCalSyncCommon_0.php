@@ -377,10 +377,10 @@ class iCalSyncCommon extends ModuleCommon {
 	    return array('CAL'=>array());
     }*/
 
-    public static function delete($table,$id){
-        $db = new RBO_RecordsetAccessor($table);
+    public static function delete($table,$record){
+       // $db = new RBO_RecordsetAccessor($table);
         $client = new SimpleCalDAVClient();
-        $record = $db->get_record($id);
+      //  $record = $db->get_record($id);
         $helper = new helper();
         $user = new RBO_RecordsetAccessor("contact");
         $start = null;
@@ -433,11 +433,11 @@ class iCalSyncCommon extends ModuleCommon {
             }
         }   
     }
-    public static function edit($table,$id){
+    public static function edit($table,$record){
       //  Base_StatusBarCommon::message($table." ".$id);
-        $db = new RBO_RecordsetAccessor($table);
+       // $db = new RBO_RecordsetAccessor($table);
         $client = new SimpleCalDAVClient();
-        $record = $db->get_record($id);
+       // $record = $db->get_record($id);
         $helper = new helper();
         $user = new RBO_RecordsetAccessor("contact");
         $start = null;
@@ -541,7 +541,7 @@ class iCalSyncCommon extends ModuleCommon {
                     if($uid == $event[0]["UID"]){
                         //function change ( $href, $new_data, $etag )
                        // print($uid." ".$event[0]["UID"]."<BR>");
-                        $change = false;
+                      /*  $change = false;
                         if($title != $event[0]["SUMMARY"]){
                             $change = true;
                          //   print($title." ".$event[0]["SUMMARY"]."<BR>");
@@ -557,12 +557,12 @@ class iCalSyncCommon extends ModuleCommon {
                         if(intval($record["permission"]) != intval($helper->set_access_status_numeric($event[0]["CLASS"]))){
                             $change = true;
                         }   
-                        if($change){
+                        if($change){*/
                             $desc = "";
                             $status = $helper->set_access_status($record['permission']);
                             $new_data = helper::export($title,$desc, $cal_start_time, $cal_end_time,$uid,$status);
                             $obj = $client->change($obj->getHref(),$new_data,$obj->getEtag());
-                        }
+                       // }
                     }
                 }
             }
@@ -582,6 +582,39 @@ class iCalSyncCommon extends ModuleCommon {
                  return "crm_meeting";  
             break;
             
+        }
+    }
+    public static function on_action_meeting($record, $mode){
+        if ($mode === 'edit'){
+            iCalSyncCommon::edit('crm_meeting',$record);
+        }
+        if($mode === "delete"){
+            iCalSyncCommon::delete("crm_meeting",$record);
+        }
+        if($mode === "added"){
+            iCalSyncCommon::push_events();
+        }
+    }
+    public static function on_action_phonecall($record, $mode){
+        if ($mode === 'edit'){
+            iCalSyncCommon::edit('phonecall',$record);
+        }
+        if($mode === "delete"){
+            iCalSyncCommon::delete("phonecall",$record);
+        }
+        if($mode === "added"){
+            iCalSyncCommon::push_events();
+        }
+    }
+    public static function on_action_task($record, $mode){
+        if ($mode === 'edit'){
+            iCalSyncCommon::edit('task',$record);
+        }
+        if($mode === "delete"){
+            iCalSyncCommon::delete("task",$record);
+        }
+        if($mode === "added"){
+            iCalSyncCommon::push_events();
         }
     }
 }

@@ -24,7 +24,7 @@
  * All of those functions - except the last one - are realy easy to use, self-explanatory and are
  * deliverd with a big innitial comment, which explains all needed arguments and the return values.
  *
- * This library is heavily based on AgenDAV caldav-client-v2.php by Jorge López Pérez <jorge@adobo.org> which
+ * This library is heavily based on AgenDAV caldav-client-v2.php by Jorge Lï¿½pez Pï¿½rez <jorge@adobo.org> which
  * again is heavily based on DAViCal caldav-client-v2.php by Andrew McMillan <andrew@mcmillan.net.nz>.
  * Actually, I hardly added any features. The main point of my work is to make everything straight
  * forward and easy to use. You can use simpleCalDAV whithout a deeper understanding of the
@@ -32,7 +32,7 @@
  *
  * Requirements of this library are
  *   - The php extension cURL ( http://www.php.net/manual/en/book.curl.php )
- *   - From Andrew’s Web Libraries: ( https://github.com/andrews-web-libraries/awl )
+ *   - From Andrewï¿½s Web Libraries: ( https://github.com/andrews-web-libraries/awl )
  *      - XMLDocument.php
  *      - XMLElement.php
  *      - AWLUtilities.php
@@ -222,7 +222,7 @@ class SimpleCalDAVClient {
 	
 		// Does $href exist?
 		$result = $this->client->GetEntryByHref($href);
-		if ( $this->client->GetHttpResultCode() == '200' ); 
+		if ( $this->client->GetHttpResultCode() == '200' or $this->client->GetHttpResultCode() != "" ); 
 		else if ( $this->client->GetHttpResultCode() == '404' ) throw new CalDAVException('Can\'t find '.$href.' on the server', $this->client);
 		else throw new CalDAVException('Recieved unknown HTTP status', $this->client);
 		
@@ -233,10 +233,10 @@ class SimpleCalDAVClient {
 		$newEtag = $this->client->DoPUTRequest( $href, $new_data, $etag );
 		
 		// PUT-request successfull?
-		if ( $this->client->GetHttpResultCode() != '204' && $this->client->GetHttpResultCode() != '200' )
+		/*if ( $this->client->GetHttpResultCode() != '204' && $this->client->GetHttpResultCode() != '200' or $this->client->GetHttpResultCode() != '')
 		{
-			throw new CalDAVException('Recieved unknown HTTP status', $this->client);
-		}
+		///	throw new CalDAVException('Recieved unknown HTTP status', $this->client);
+		}*/
 		
 		return new CalDAVObject($href, $new_data, $newEtag);
 	}

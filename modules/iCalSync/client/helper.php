@@ -157,4 +157,8 @@ class helper {
         return $icalobj->export();
     
       }
+      public static function normalTimeToCalDav($time){
+        return ZCiCal::fromSqlDateTime($time);
+
+      }
 }

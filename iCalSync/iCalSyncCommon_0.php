@@ -412,7 +412,7 @@ class iCalSyncCommon extends ModuleCommon {
         $employes = $record["employees"];
         foreach($employes as $employer){
             $user = $user->get_record($employer);
-            if(isset($user["calendar_url"])){
+            if($user->get_val('calendar_url') != ""){
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
@@ -434,10 +434,7 @@ class iCalSyncCommon extends ModuleCommon {
         }   
     }
     public static function edit($table,$record){
-      //  Base_StatusBarCommon::message($table." ".$id);
-       // $db = new RBO_RecordsetAccessor($table);
         $client = new SimpleCalDAVClient();
-       // $record = $db->get_record($id);
         $helper = new helper();
         $user = new RBO_RecordsetAccessor("contact");
         $start = null;
@@ -526,7 +523,7 @@ class iCalSyncCommon extends ModuleCommon {
         $employes = $record["employees"];
         foreach($employes as $employer){
             $user = $user->get_record($employer);
-            if(isset($user["calendar_url"])){
+            if($user->get_val('calendar_url') != ""){
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
@@ -539,25 +536,6 @@ class iCalSyncCommon extends ModuleCommon {
                     $ical = new ical('data.ics');
                     $event = $ical->events();
                     if($uid == $event[0]["UID"]){
-                        //function change ( $href, $new_data, $etag )
-                       // print($uid." ".$event[0]["UID"]."<BR>");
-                      /*  $change = false;
-                        if($title != $event[0]["SUMMARY"]){
-                            $change = true;
-                         //   print($title." ".$event[0]["SUMMARY"]."<BR>");
-                        }
-                        if($helper->normalTimeToCalDav($cal_start_time) != $event[0]["DTSTART"]){
-                          //  print($helper->normalTimeToCalDav($cal_start_time). " : ".$event[0]["DTSTART"]."<BR>");
-                            $change = true;
-                        }
-                        if($helper->normalTimeToCalDav($cal_end_time) != $event[0]["DTEND"]){
-                            $change = true;
-                           // print($helper->normalTimeToCalDav($cal_end_time). " : ".$event[0]["DTEND"]."<BR>");
-                        }
-                        if(intval($record["permission"]) != intval($helper->set_access_status_numeric($event[0]["CLASS"]))){
-                            $change = true;
-                        }   
-                        if($change){*/
                             $desc = "";
                             $status = $helper->set_access_status($record['permission']);
                             $new_data = helper::export($title,$desc, $cal_start_time, $cal_end_time,$uid,$status);

@@ -172,7 +172,6 @@ class iCalSyncCommon extends ModuleCommon {
         $sumary = $data_extra['subject'];// $query[$l]["f_subject"];
         $st = $day['date_and_time'];// $query[$l]["f_date_and_time"];
         $desc = $day->get_val('description');
-       // $desc = str_replace("<br>", "  ", $desc);
         $end = $st;
         $phonenumber = $data_extra["other_phone_number"];
         if($phonenumber == ""){ 
@@ -251,10 +250,8 @@ class iCalSyncCommon extends ModuleCommon {
                 $catch = $rbo_meet->get_records(array('uid' => $uid));
                 $catch2 = $rbo_phone->get_records(array('uid' => $uid));
                 $catch3 = $rbo_task->get_records(array('uid' => $uid));
-                
-                //Metings
+
                 if($catch != null){
-                  //  print("UPDATING - ".$uid . "<BR>");
                     $get_event = $rbo_meet->get_records(array("uid" => $uid));
                     foreach($get_event as $ev){
                        $get_event = $ev;
@@ -373,16 +370,10 @@ class iCalSyncCommon extends ModuleCommon {
             }
         }
     }
-   /* public static function menu() {
-	    return array('CAL'=>array());
-    }*/
-
     public static function delete($table,$record){
-       // $db = new RBO_RecordsetAccessor($table);
         $client = new SimpleCalDAVClient();
-      //  $record = $db->get_record($id);
         $helper = new helper();
-        $user = new RBO_RecordsetAccessor("contact");
+        $rbo_user = new RBO_RecordsetAccessor("contact");
         $start = null;
         $end = null;
         $uid = $record["uid"];;
@@ -411,7 +402,7 @@ class iCalSyncCommon extends ModuleCommon {
         }
         $employes = $record["employees"];
         foreach($employes as $employer){
-            $user = $user->get_record($employer);
+            $user = $rbo_user->get_record($employer);
             if($user->get_val('calendar_url') != ""){
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 $arrayOfCalendars = $client->findCalendars(); 
@@ -436,7 +427,7 @@ class iCalSyncCommon extends ModuleCommon {
     public static function edit($table,$record){
         $client = new SimpleCalDAVClient();
         $helper = new helper();
-        $user = new RBO_RecordsetAccessor("contact");
+        $rbo_user = new RBO_RecordsetAccessor("contact");
         $start = null;
         $end = null;
         $uid = $record["uid"];;
@@ -522,7 +513,7 @@ class iCalSyncCommon extends ModuleCommon {
         }
         $employes = $record["employees"];
         foreach($employes as $employer){
-            $user = $user->get_record($employer);
+            $user = $rbo_user->get_record($employer);
             if($user->get_val('calendar_url') != ""){
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 $arrayOfCalendars = $client->findCalendars(); 

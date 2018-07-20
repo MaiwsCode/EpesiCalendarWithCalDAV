@@ -33,6 +33,12 @@ public function uninstall() {
 		Utils_RecordBrowserCommon::delete_record_field('crm_meeting','uid');
 		Utils_RecordBrowserCommon::delete_record_field('phonecall','uid');
 		Utils_RecordBrowserCommon::delete_record_field('task','uid');
+		Utils_RecordBrowserCommon::unregister_processing_callback('crm_meeting', array($this->get_type () . 'Common', 'on_action_meeting'));
+		Utils_RecordBrowserCommon::unregister_processing_callback('phonecall', array($this->get_type () . 'Common', 'on_action_phonecall'));
+		Utils_RecordBrowserCommon::unregister_processing_callback('task', array($this->get_type () . 'Common', 'on_action_task'));
+		Utils_RecordBrowserCommon::delete_record_field('contact','calendar url');
+		Utils_RecordBrowserCommon::delete_record_field('contact','cal password');
+		$ret = true;
              //   DB::Execute("DROP TABLE public.users_calendar");
 		return $ret; // Return false on success and false on failure
 	}

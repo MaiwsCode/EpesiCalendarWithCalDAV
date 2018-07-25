@@ -121,7 +121,11 @@ class iCalSyncCommon extends ModuleCommon {
             $rbo = new RBO_RecordsetAccessor('contact');
             $user = $rbo->get_record($employer);
             if($user->get_val('calendar_url') != ''){ 
-                $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+                try{
+                    $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+                    }catch(Exception $e){
+                        continue;
+                    }
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
                 $create_new = $client->create(helper::export($sumary,$desc, $st, $end,$new_uid,$status));
@@ -155,7 +159,11 @@ class iCalSyncCommon extends ModuleCommon {
         foreach ($employes as $employer){
             $user = $rbo->get_record($employer);
             if($user->get_val('calendar_url') != ''){ 
-                $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+                try{
+                    $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+                    }catch(Exception $e){
+                        continue;
+                    }
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
                 $create_new = $client->create(helper::export($sumary,$desc, $time, $time,$new_uid,$status));
@@ -204,7 +212,11 @@ class iCalSyncCommon extends ModuleCommon {
             $user = $rbo->get_record($employer);
             if($user->get_val('calendar_url') != ''){ 
                 $client = new SimpleCalDAVClient();
-                $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+                try{
+                    $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+                    }catch(Exception $e){
+                        continue;
+                    }
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
                 $create_new = $client->create(helper::export($sumary,$desc, $day['date_and_time'], $day['date_and_time'],$new_uid,$status));
@@ -220,7 +232,11 @@ class iCalSyncCommon extends ModuleCommon {
         $users_urls = $rbo->get_records(array('!calendar_url' => ''));
         foreach($users_urls as $user ){      
             $Connetion_data = "Connetion_data";
-            $client = new CalDAVClient($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+            try{
+                $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+                }catch(Exception $e){
+                    continue;
+                }
             $start = $helper->get_date();
             $result = $client->GetEvents($start);
             for( $i = 0; $i < count($result); $i++) {
@@ -404,7 +420,11 @@ class iCalSyncCommon extends ModuleCommon {
         foreach($employes as $employer){
             $user = $rbo_user->get_record($employer);
             if($user->get_val('calendar_url') != ""){
+                try{
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+                }catch(Exception $e){
+                    continue;
+                }
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
                 $events = $client->getEvents($start,$end);
@@ -515,7 +535,11 @@ class iCalSyncCommon extends ModuleCommon {
         foreach($employes as $employer){
             $user = $rbo_user->get_record($employer);
             if($user->get_val('calendar_url') != ""){
-                $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+                try{
+                    $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+                    }catch(Exception $e){
+                        continue;
+                    }
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
                 $events = $client->getEvents($start,$end);

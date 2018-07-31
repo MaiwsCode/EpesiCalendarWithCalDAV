@@ -13,19 +13,24 @@ require 'client/helper.php';
 class iCalSyncCommon extends ModuleCommon {
 
 
+  /*  public static function menu() {
+        return array('Label'=>array());
+    }*/
+
     public static function cron() {
         return array(
            'update' => 2, 
            'update_changes' => 3,
         );
     }
+
+
      // SERVER -> EPESI
    public static function update() {
         $helper = new helper();
         $rbo = new RBO_RecordsetAccessor('contact');
         $users_urls = $rbo->get_records(array('!calendar_url' => ''));
         foreach($users_urls as $user ){      
-            $Connetion_data = "Connetion_data";
             $client = new CalDAVClient($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
             $start = $helper->get_date();
             $result = $client->GetEvents($start);
@@ -78,9 +83,81 @@ class iCalSyncCommon extends ModuleCommon {
                     $event = $rbo_meet->new_record($data);
                     $event->created_by = $user->get_val('login');
                     $event->created_on = $now;           
-                    $event->save();       
+                    $event->save();      
+                    $f = fopen('etags.txt','a');
+                    fwrite($f, $uid."\n");
+                    fclose($f);
+                }
+            }
+            $start = $helper->get_date();
+            $result = $client->GetEvents($start);
+            $fo = file("etags.txt");
+            $toRemove = array();
+            print(count($result));
+            for($y = 0;$y<count($fo);$y++){
+                $noone = true;
+                for($x = 0;$x<count($result);$x++){
+                    $obj = new CalDAVObject($result[$x]['href'], $result[$x]['data'], $result[$x]['etag']);
+                    $file = fopen("data.ics","w+");
+                    fputs($file,$obj->getData(), strlen($obj->getData()));
+                    fclose($file);
+                    $ical = new ical('data.ics');
+                    $event = $ical->events();
+                    $uid = $event[0]["UID"];
+                    $str1 = substr($fo[$y],0,strlen($fo[$y])-1);
+                    print($str1 ."--". substr($fo[$y],0,strlen($fo[$y])-1)."<BR>");
+                    if($str1 == $uid){
+                        $noone = true;
+                        break;
+                    }
+                    else{
+                        $noone = false;
+                    }
+                }
+                if($noone == false){
+                    $toRemove[] = substr($fo[$y],0,strlen($fo[$y])-1);
+                }
+            }
+            print_r($toRemove);
+            foreach($toRemove as $remove){
+                $DELETE = $remove;
+                $data = file("etags.txt");
+                $out = array();
+                foreach($data as $line) {
+                    if(trim($line) != $DELETE) {
+                        $out[] = $line;
+                    }
+                }
+                $fp = fopen("etags.txt", "w+");
+                flock($fp, LOCK_EX);
+                foreach($out as $line) {
+                    fwrite($fp, $line);
+                }
+                flock($fp, LOCK_UN);
+                fclose($fp);  
+                if (stripos($remove, "Meetings") !== false) {
+                    $rbo_meet =  new RBO_RecordsetAccessor('crm_meeting');
+                    $id = str_replace("EPESIexportMeetings", "", $remove); 
+                    $rbo_meet->delete_record($id);
+                }
+                else if (stripos($remove, "Tasks") !== false) {
+                    $rbo_task =  new RBO_RecordsetAccessor('task');
+                    $id = str_replace("EPESIexportTasks", "", $remove); 
+                    $rbo_task->delete_record($id);
+                }
+                else if (stripos($remove, "Phones") !== false) {
+                    $rbo_phone =  new RBO_RecordsetAccessor('phonecall');
+                    $id = str_replace("EPESIexportPhones", "", $remove); 
+                    $rbo_phone->delete_record($id);
+                }        
+                else {
+                    $rbo_meet =  new RBO_RecordsetAccessor('crm_meeting');
+                    $records = $rbo_meet->get_records(array('uid'=> $remove),array(),array());
+                    foreach($records as $record){
+                    $rbo_meet->delete_record($record->id);}
                 }
             } 
+            fclose($fo);
         }
     }
     // EPESI EVENTS --> SERVER
@@ -129,6 +206,9 @@ class iCalSyncCommon extends ModuleCommon {
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
                 $create_new = $client->create(helper::export($sumary,$desc, $st, $end,$new_uid,$status));
+                $f = fopen('etags.txt','a');
+                fwrite($f, $new_uid."\n");
+                fclose($f);
             }
         }
         Utils_RecordBrowserCommon::update_record('crm_meeting', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false); 
@@ -167,6 +247,9 @@ class iCalSyncCommon extends ModuleCommon {
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
                 $create_new = $client->create(helper::export($sumary,$desc, $time, $time,$new_uid,$status));
+                $f = fopen('etags.txt','a');
+                fwrite($f, $new_uid."\n");
+                fclose($f);
             }
         }
        Utils_RecordBrowserCommon::update_record('task', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
@@ -182,6 +265,7 @@ class iCalSyncCommon extends ModuleCommon {
         $desc = $day->get_val('description');
         $end = $st;
         $phonenumber = $data_extra["other_phone_number"];
+        $who = $data_extra["other_customer_name"];
         if($phonenumber == ""){ 
             $klient = $data_extra["customer"];
             $klient = explode("/", $klient);
@@ -191,17 +275,20 @@ class iCalSyncCommon extends ModuleCommon {
             if($klient == 'contact'){
                 $rb = new RBO_RecordsetAccessor('contact');
                 $x = $rb->get_record($number);
+                $who = $x->get_val('last_name',$nolink = True)." ".$x->get_val('first_name',$nolink = True);
                 $phonenumber = $x->get_val('work_phone');
             if ($phonenumber == ""){ $phonenumber = $x->get_val("mobile_phone");}
             }else{
                 $rb = new RBO_RecordsetAccessor('company');
                 $x = $rb->get_record($number);
+                $who = $x->get_val('company_name',$nolink = True);
                 $phonenumber =  $x->get_val('phone'); 
             }
         }
         $new_uid = "EPESIexportPhones".$day->id;
         $new_uid = str_replace(" ", "", $new_uid);
         $sumary = $sumary." TEL: ".$phonenumber;
+        $sumary = $sumary." - ".$who;
         $st = $helper->toDateTimeCAL($st);
         $end = $helper->toDateTimeCAL($end);
         $created = $helper->toDateTimeCAL($created)."Z";
@@ -220,6 +307,9 @@ class iCalSyncCommon extends ModuleCommon {
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
                 $create_new = $client->create(helper::export($sumary,$desc, $day['date_and_time'], $day['date_and_time'],$new_uid,$status));
+                $f = fopen('etags.txt','a');
+                fwrite($f, $new_uid."\n");
+                fclose($f);
             }
         }
         Utils_RecordBrowserCommon::update_record('phonecall', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
@@ -227,21 +317,23 @@ class iCalSyncCommon extends ModuleCommon {
   }
 
     public static function update_changes(){
+        $client = new SimpleCalDAVClient();
         $helper = new helper();
         $rbo = new RBO_RecordsetAccessor('contact');
         $users_urls = $rbo->get_records(array('!calendar_url' => ''));
         foreach($users_urls as $user ){      
-            $Connetion_data = "Connetion_data";
             try{
-                $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
-                }catch(Exception $e){
-                    continue;
-                }
+            $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+        }catch(Exception $e){
+            continue;
+        }
+            $arrayOfCalendars = $client->findCalendars();     
+            $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
             $start = $helper->get_date();
             $result = $client->GetEvents($start);
             for( $i = 0; $i < count($result); $i++) {
                 $exist = false;
-                $obj = new CalDAVObject($result[$i]["href"], $result[$i]["data"], $result[$i]["etag"]);
+                $obj = new CalDAVObject($result[$i]->getHref(), $result[$i]->getData(), $result[$i]->getEtag());
                 $file = fopen("data.ics","w+");
                 fputs($file,$obj->getData(), strlen($obj->getData()));
                 fclose($file);
@@ -288,6 +380,7 @@ class iCalSyncCommon extends ModuleCommon {
                     if($duration != $get_event['duration']){$change = true;}
                     if(intval($status) !=intval($get_event['permission'])){$change = true; }
                     if($change == true){
+                        print("UPDATING - meetings");
                         Utils_RecordBrowserCommon::update_record('crm_meeting', $id, array('uid' => $uid,
                     'title' => $summary,'date' => $date,'time' => $start,
                     'duration' => $duration,'status' => 0, 'priority' => '1',
@@ -311,6 +404,7 @@ class iCalSyncCommon extends ModuleCommon {
                     }
                     $end = $start;
                     $phonenumber = $get_event["other_phone_number"];
+                    $who = $record["other_customer_name"];
                     if($phonenumber == ""){ 
                         $klient = $get_event["customer"];
                         $klient = explode("/", $klient);
@@ -321,18 +415,23 @@ class iCalSyncCommon extends ModuleCommon {
                             $rb = new RBO_RecordsetAccessor('contact');
                             $x = $rb->get_record($number);
                             $phonenumber = $x->get_val('work_phone');
+                            $who = $x->get_val('last_name',$nolink = True)." ".$x->get_val('first_name',$nolink = True);
                         if ($phonenumber == ""){ $phonenumber = $x->get_val("mobile_phone");}
                     }else{
                         $rb = new RBO_RecordsetAccessor('company');
                         $x = $rb->get_record($number);
+                        $who = $x->get_val('company_name',$nolink = True);
                         $phonenumber =  $x->get_val('phone'); 
                         }
                     }
 
-                    $sum = $get_event['subject']." TEL: ".$phonenumber;
+                    $sum = $get_event['subject']." TEL: ".$phonenumber." - ".$who;
                     //if($summary != $sum){$change = true; print("CHANGING SUMMARY <BR>"); }
-                if($start != $get_event['time']){$change = true;/* print("CHANGING TIME <BR>");*/ }
-                if(intval($status) != intval($get_event['permission'])){$change = true;/* print("CHANGING PERMISSION <BR>");*/ }
+                if($start != $get_event['time']){
+                    $change = true;/* print("CHANGING TIME <BR>");*/
+                }
+                if(intval($status) != intval($get_event['permission'])){
+                    $change = true; /* print("CHANGING PERMISSION <BR>");*/ }
                     if($change == true){
                         if($summary != $sum ){
                             Utils_RecordBrowserCommon::update_record('phonecall', $id, array('uid' => $uid,
@@ -342,6 +441,7 @@ class iCalSyncCommon extends ModuleCommon {
                         ),$full_update=false, $date=null, $dont_notify=false);
                 }
                 else{
+                    print("UPDATING -ohnne");
                     Utils_RecordBrowserCommon::update_record('phonecall', $id, array('uid' => $uid,
                        'date_and_time' => $start,
                         'status' => 0, 'priority' => '1',
@@ -423,7 +523,7 @@ class iCalSyncCommon extends ModuleCommon {
                 try{
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 }catch(Exception $e){
-                    continue;
+                    break;
                 }
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
@@ -467,6 +567,7 @@ class iCalSyncCommon extends ModuleCommon {
                 $end = $end."T235959Z";
                 $start = $start."T000000Z";
                 $phonenumber = $record["other_phone_number"];
+                $who = $record["other_customer_name"];
                 if($phonenumber == ""){ 
                     $klient = $record["customer"];
                     $klient = explode("/", $klient);
@@ -477,14 +578,16 @@ class iCalSyncCommon extends ModuleCommon {
                     $rb = new RBO_RecordsetAccessor('contact');
                     $x = $rb->get_record($number);
                     $phonenumber = $x->get_val('work_phone');
+                    $who = $x->get_val('last_name',$nolink = True)." ".$x->get_val('first_name',$nolink = True);
                 if ($phonenumber == ""){ $phonenumber = $x->get_val("mobile_phone");}
                 }else{
                     $rb = new RBO_RecordsetAccessor('company');
                     $x = $rb->get_record($number);
+                    $who = $x->get_val('company_name',$nolink = True);
                     $phonenumber =  $x->get_val('phone'); 
                     }
                 }
-                $title = $record["subject"]." TEL: ".$phonenumber;
+                $title = $record["subject"]." TEL: ".$phonenumber. " - ".$who;
             break;
             case "task":
                 $start = $record['deadline'];
@@ -538,7 +641,7 @@ class iCalSyncCommon extends ModuleCommon {
                 try{
                     $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                     }catch(Exception $e){
-                        continue;
+                        break;
                     }
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);

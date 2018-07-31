@@ -10,6 +10,9 @@ class helper {
 
     public static function get_date(){
     $date = date("Y-m-d");
+    $tmp = strtotime($date);
+    $tmp = $tmp - (60*60*24*14);
+    $date = date("Y-m-d",$tmp);
     $date = str_replace("-", "" ,$date);
     $date = $date."T000000Z";
     return $date;

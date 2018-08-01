@@ -23,7 +23,9 @@ class iCalSyncCommon extends ModuleCommon {
            'update_changes' => 3,
         );
     }
-
+    public static function version(){
+        return "UPDATE 1";
+    }
 
      // SERVER -> EPESI
    public static function update() {

@@ -27,18 +27,21 @@ class iCalSyncCommon extends ModuleCommon {
 
      // SERVER -> EPESI
    public static function update() {
-       $br = "<BR>";
+        $br = "<BR>";
+        $client = new SimpleCalDAVClient();
         print("RADICALE to EPESI download events". $br);
         $helper = new helper();
         $rbo = new RBO_RecordsetAccessor('contact');
         $users_urls = $rbo->get_records(array('!calendar_url' => ''));
         foreach($users_urls as $user ){      
-            $client = new CalDAVClient($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+            $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+            $arrayOfCalendars = $client->findCalendars(); 
+            $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
             $start = $helper->get_date();
             $result = $client->GetEvents($start);
             for( $i = 0; $i < count($result); $i++) {
                 $exist = false;
-                $obj = new CalDAVObject($result[$i]["href"], $result[$i]["data"], $result[$i]["etag"]);
+                $obj = new CalDAVObject($result[$i]->getHref(), $result[$i]->getData(), $result[$i]->getEtag());
                 $file = fopen("data.ics","w+");
                 fputs($file,$obj->getData(), strlen($obj->getData()));
                 fclose($file);
@@ -62,7 +65,15 @@ class iCalSyncCommon extends ModuleCommon {
                 $catch = $rbo_meet->get_records(array('uid' => $uid));
                 $catch2 = $rbo_phone->get_records(array('uid' => $uid));
                 $catch3 = $rbo_task->get_records(array('uid' => $uid));
-                if($catch != null or $catch2 != null or $catch3 != null){ $exist = true;}
+                if($catch != null || $catch2 != null || $catch3 != null){ $exist = true;}
+                $fo = file("etags.txt");
+                foreach($fo as $line) {
+                   $str =  substr($line,0,strlen($line)-1);
+                    if($str == $uid){
+                        $exist = true;
+                    }
+
+                }
                 if($exist == false){
                     print($uid." doesnt exist - adding new ".$br);
                     if(isset($event[0]["DESCRIPTION"])){
@@ -79,6 +90,7 @@ class iCalSyncCommon extends ModuleCommon {
                         $end = $helper->convert_date_time($end);
                         $duration = $helper->duration($start, $end);
                     }
+                    $str1 = substr($fo[$y],0,strlen($fo[$y])-1);
                     $now = date("Y-m-d H:i:s");
                     $id = $user->id;
                     print("RADICALE to EPESI adding event".$uid." ". $br);
@@ -102,7 +114,7 @@ class iCalSyncCommon extends ModuleCommon {
             for($y = 0;$y<count($fo);$y++){
                 $noone = true;
                 for($x = 0;$x<count($result);$x++){
-                    $obj = new CalDAVObject($result[$x]['href'], $result[$x]['data'], $result[$x]['etag']);
+                    $obj = new CalDAVObject($result[$x]->getHref(), $result[$x]->getData(), $result[$x]->getEtag());
                     $file = fopen("data.ics","w+");
                     fputs($file,$obj->getData(), strlen($obj->getData()));
                     fclose($file);

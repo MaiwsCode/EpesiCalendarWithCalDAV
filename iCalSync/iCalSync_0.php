@@ -17,7 +17,9 @@ class iCalSync extends Module { // Note, how the class' name reflects module's p
   
   public function body(){
 
-       
+       iCalSyncCommon::push_events();
+       iCalSyncCommon::update();
+       iCalSyncCommon::update_changes();
           }
 public function settings()
 	{

@@ -13,9 +13,9 @@ require 'client/helper.php';
 class iCalSyncCommon extends ModuleCommon {
 
 
-  /*  public static function menu() {
-        return array('Label'=>array());
-    }*/
+    public static function menu() {
+        return array('iCal'=>array());
+    }
 
     public static function cron() {
         return array(
@@ -27,6 +27,8 @@ class iCalSyncCommon extends ModuleCommon {
 
      // SERVER -> EPESI
    public static function update() {
+       $br = "<BR>";
+        print("RADICALE to EPESI download events". $br);
         $helper = new helper();
         $rbo = new RBO_RecordsetAccessor('contact');
         $users_urls = $rbo->get_records(array('!calendar_url' => ''));
@@ -78,6 +80,7 @@ class iCalSyncCommon extends ModuleCommon {
                     }
                     $now = date("Y-m-d H:i:s");
                     $id = $user->id;
+                    print("RADICALE to EPESI adding event".$uid." ". $br);
                     $data = array('uid' => $uid, 'Title' => $summary, 'date' => $date,'time' => $start,
                     'duration' => $duration,'status' => 0, 'priority' => '1', 'permission' => $status, 'Employees' => $id);
                     $event = $rbo_meet->new_record($data);
@@ -93,7 +96,8 @@ class iCalSyncCommon extends ModuleCommon {
             $result = $client->GetEvents($start);
             $fo = file("etags.txt");
             $toRemove = array();
-            print(count($result));
+          //  print(count($result));
+          print("RADICALE to EPESI removing deleting events". $br);
             for($y = 0;$y<count($fo);$y++){
                 $noone = true;
                 for($x = 0;$x<count($result);$x++){
@@ -105,7 +109,7 @@ class iCalSyncCommon extends ModuleCommon {
                     $event = $ical->events();
                     $uid = $event[0]["UID"];
                     $str1 = substr($fo[$y],0,strlen($fo[$y])-1);
-                    print($str1 ."--". substr($fo[$y],0,strlen($fo[$y])-1)."<BR>");
+                   // print($str1 ."--". substr($fo[$y],0,strlen($fo[$y])-1)."<BR>");
                     if($str1 == $uid){
                         $noone = true;
                         break;
@@ -118,7 +122,7 @@ class iCalSyncCommon extends ModuleCommon {
                     $toRemove[] = substr($fo[$y],0,strlen($fo[$y])-1);
                 }
             }
-            print_r($toRemove);
+            //print_r($toRemove);
             foreach($toRemove as $remove){
                 $DELETE = $remove;
                 $data = file("etags.txt");
@@ -162,6 +166,8 @@ class iCalSyncCommon extends ModuleCommon {
     }
     // EPESI EVENTS --> SERVER
     public static function push_events(){
+        $br = "<BR>";
+        print("EPESI to RADICALE push events". $br);
         $helper = new helper();
         $date = date_create(date('Y-m-d'));
         date_sub($date, date_interval_create_from_date_string('14 days'));
@@ -201,6 +207,7 @@ class iCalSyncCommon extends ModuleCommon {
                 try{
                     $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                     }catch(Exception $e){
+                        print("EPESI to RADICALE user dont have set url". $br);
                         continue;
                     }
                 $arrayOfCalendars = $client->findCalendars(); 
@@ -242,6 +249,7 @@ class iCalSyncCommon extends ModuleCommon {
                 try{
                     $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                     }catch(Exception $e){
+                        print("EPESI to RADICALE user dont have set url". $br);
                         continue;
                     }
                 $arrayOfCalendars = $client->findCalendars(); 
@@ -302,6 +310,7 @@ class iCalSyncCommon extends ModuleCommon {
                 try{
                     $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                     }catch(Exception $e){
+                        print("EPESI to RADICALE user dont have set url". $br);
                         continue;
                     }
                 $arrayOfCalendars = $client->findCalendars(); 
@@ -317,6 +326,8 @@ class iCalSyncCommon extends ModuleCommon {
   }
 
     public static function update_changes(){
+        $br = "<BR>";
+        print("UPDATE CHANGES ON SERVER ". $br);
         $client = new SimpleCalDAVClient();
         $helper = new helper();
         $rbo = new RBO_RecordsetAccessor('contact');
@@ -324,9 +335,10 @@ class iCalSyncCommon extends ModuleCommon {
         foreach($users_urls as $user ){      
             try{
             $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
-        }catch(Exception $e){
-            continue;
-        }
+            }catch(Exception $e){
+                print("EPESI to RADICALE user dont have set url". $br);
+                continue;
+            }
             $arrayOfCalendars = $client->findCalendars();     
             $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
             $start = $helper->get_date();
@@ -360,6 +372,7 @@ class iCalSyncCommon extends ModuleCommon {
                 $catch3 = $rbo_task->get_records(array('uid' => $uid));
 
                 if($catch != null){
+                    print("UPDATING meetings".$br);
                     $get_event = $rbo_meet->get_records(array("uid" => $uid));
                     foreach($get_event as $ev){
                        $get_event = $ev;
@@ -380,17 +393,19 @@ class iCalSyncCommon extends ModuleCommon {
                     if($duration != $get_event['duration']){$change = true;}
                     if(intval($status) !=intval($get_event['permission'])){$change = true; }
                     if($change == true){
-                        print("UPDATING - meetings");
+                        print("UPDATING - ".$uid." ".$br);
                         Utils_RecordBrowserCommon::update_record('crm_meeting', $id, array('uid' => $uid,
                     'title' => $summary,'date' => $date,'time' => $start,
                     'duration' => $duration,'status' => 0, 'priority' => '1',
                      'permission' => $status),$full_update=false, $date=null, $dont_notify=false);
-                    }      
+                    } else{
+                        print("No changes - no update".$br);
+                    }     
                 }
 
                 // PHOnes
                 if($catch2 != null){
-                   // print("UPDATING - ".$uid . "<BR>");
+                    print("UPDATING phones".$br);
                     $get_event = $rbo_phone->get_records(array("uid" => $uid));
                     foreach($get_event as $ev){
                        $get_event = $ev;
@@ -426,14 +441,21 @@ class iCalSyncCommon extends ModuleCommon {
                     }
 
                     $sum = $get_event['subject']." TEL: ".$phonenumber." - ".$who;
-                    //if($summary != $sum){$change = true; print("CHANGING SUMMARY <BR>"); }
-                if($start != $get_event['time']){
-                    $change = true;/* print("CHANGING TIME <BR>");*/
+                    if($summary != $sum){
+                        $change = true; 
+                        print("CHANGING SUMMARY <BR>"); 
+                        print("$sum :: $summary <BR>"); 
+                    }
+                if($start != $get_event['date_and_time']){
+                     $change = true;
+                     print("CHANGING TIME <BR>");
+                     print("$start :: ".$get_event['date_and_time']." <BR>");
                 }
                 if(intval($status) != intval($get_event['permission'])){
-                    $change = true; /* print("CHANGING PERMISSION <BR>");*/ }
+                    $change = true;  print("CHANGING PERMISSION <BR>"); }
                     if($change == true){
                         if($summary != $sum ){
+                            print("UPDATING ".$uid." ".$br);
                             Utils_RecordBrowserCommon::update_record('phonecall', $id, array('uid' => $uid,
                             'subject' => $summary,'date_and_time' => $start,
                             'status' => 0, 'priority' => '1',
@@ -441,17 +463,19 @@ class iCalSyncCommon extends ModuleCommon {
                         ),$full_update=false, $date=null, $dont_notify=false);
                 }
                 else{
-                    print("UPDATING -ohnne");
+                    print("UPDATING ".$uid." ".$br);
                     Utils_RecordBrowserCommon::update_record('phonecall', $id, array('uid' => $uid,
                        'date_and_time' => $start,
                         'status' => 0, 'priority' => '1',
                          'permission' => $status
                     ),$full_update=false, $date=null, $dont_notify=false);
                 }
+            }else{
+                print("No changes - no update ".$br);
             }     
         }
                 if($catch3 != null){
-                    print("UPDATING - ".$uid . "<BR>");
+                    print("UPDATING - tasks ".$br);
                     $get_event = $rbo_task->get_records(array("uid" => $uid));
                     foreach($get_event as $ev){
                        $get_event = $ev;
@@ -465,22 +489,31 @@ class iCalSyncCommon extends ModuleCommon {
                         $start = $date." 12:00:00";
                         $without = 0;
                     }
-                    if($summary != $get_event['title']){$change = true; print(" CHANGING TITLE <BR>"); }
-                    if($start != $get_event['deadline']){$change = true; print(" CHANGING TIME <BR>");}
-                    if(intval($status) !=intval($get_event['permission'])){$change = true; print(" CHANGING STATUS <BR>");}
+                if($summary != $get_event['title']){$change = true;
+                 //print(" CHANGING TITLE <BR>"); 
+                }
+            if($start != $get_event['deadline']){$change = true;
+            // print(" CHANGING TIME <BR>");
+        }
+        if(intval($status) !=intval($get_event['permission'])){$change = true;
+        // print(" CHANGING STATUS <BR>");
+}
                     if($change == true){
                     if($without == 0){
-                        print("UPDATING <br>");
+                        print("UPDATING ".$uid.$br);
                     Utils_RecordBrowserCommon::update_record('task', $id, array('uid' => $uid,
                     'title' => $summary,'deadline' => $start,'timeless' => '1',
                     'status' => 0, 'priority' => '1',
                     'permission' => $status),$full_update=false, $date=null, $dont_notify=false);
-                      }else{print("UPDATING <br>");
+                      }else{
+                        print("UPDATING ".$uid.$br);
                             Utils_RecordBrowserCommon::update_record('task', $id, array('uid' => $uid,
                             'title' => $summary,'deadline' => $start,'timeless' => '0',
                             'status' => 0, 'priority' => '1',
                             'permission' => $status),$full_update=false, $date=null, $dont_notify=false);     
                         }
+                    }else{
+                        print("No changes no update ".$br);
                     }             
                 }
             }
@@ -545,6 +578,8 @@ class iCalSyncCommon extends ModuleCommon {
         }   
     }
     public static function edit($table,$record){
+        $br = "<BR>";
+        print("EPESI to RADICALE edit event". $br);
         $client = new SimpleCalDAVClient();
         $helper = new helper();
         $rbo_user = new RBO_RecordsetAccessor("contact");
@@ -641,7 +676,8 @@ class iCalSyncCommon extends ModuleCommon {
                 try{
                     $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                     }catch(Exception $e){
-                        break;
+                        print("User have bad url or none". $br);    
+                        continue;
                     }
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
@@ -654,6 +690,7 @@ class iCalSyncCommon extends ModuleCommon {
                     $ical = new ical('data.ics');
                     $event = $ical->events();
                     if($uid == $event[0]["UID"]){
+                        print("EPESI to RADICALE edit event - ".$uid. $br);
                             $desc = "";
                             $status = $helper->set_access_status($record['permission']);
                             $new_data = helper::export($title,$desc, $cal_start_time, $cal_end_time,$uid,$status);

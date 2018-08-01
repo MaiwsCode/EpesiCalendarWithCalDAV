@@ -64,6 +64,7 @@ class iCalSyncCommon extends ModuleCommon {
                 $catch3 = $rbo_task->get_records(array('uid' => $uid));
                 if($catch != null or $catch2 != null or $catch3 != null){ $exist = true;}
                 if($exist == false){
+                    print($uid." doesnt exist - adding new ".$br);
                     if(isset($event[0]["DESCRIPTION"])){
                         $description = $event[0]["DESCRIPTION"];
                     }

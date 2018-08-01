@@ -540,7 +540,7 @@ class iCalSyncCommon extends ModuleCommon {
         $rbo_user = new RBO_RecordsetAccessor("contact");
         $start = null;
         $end = null;
-        $uid = $record["uid"];;
+        $uid = $record["uid"];
         switch($table){
             case "phonecall":
                 $start = $record['date_and_time'];
@@ -577,7 +577,6 @@ class iCalSyncCommon extends ModuleCommon {
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
                 $events = $client->getEvents($start,$end);
-                
                 foreach($events as $event_){
                     $obj = new CalDAVObject($event_->getHref(), $event_->getData(), $event_->getEtag());
                     $file = fopen("data.ics","w+");
@@ -587,7 +586,6 @@ class iCalSyncCommon extends ModuleCommon {
                     $event = $ical->events();
                     if($uid == $event[0]["UID"]){
                         $client->delete($event_->getHref(),$event_->getEtag());
-                      //  Base_StatusBarCommon::message("DELETED FROM".$table."=> id:".$id."<Br> FOR UID $uid and ".$event[0]["UID"]);
                     }
                 }
             }
@@ -595,13 +593,12 @@ class iCalSyncCommon extends ModuleCommon {
     }
     public static function edit($table,$record){
         $br = "<BR>";
-        print("EPESI to RADICALE edit event". $br);
         $client = new SimpleCalDAVClient();
         $helper = new helper();
         $rbo_user = new RBO_RecordsetAccessor("contact");
         $start = null;
         $end = null;
-        $uid = $record["uid"];;
+        $uid = $record["uid"];
         $title = "";
         $cal_start_time = "";
         $cal_end_time = "";
@@ -676,7 +673,6 @@ class iCalSyncCommon extends ModuleCommon {
                 if($cal_start_time == null){
                     $cal_start_time = $record['date'];
                     $cal_end_time =$record['date'];
-
                 }
                 if($cal_end_time == null){
                     $cal_end_time = $record['duration'];  
@@ -689,29 +685,20 @@ class iCalSyncCommon extends ModuleCommon {
         foreach($employes as $employer){
             $user = $rbo_user->get_record($employer);
             if($user->get_val('calendar_url') != ""){
-                try{
-                    $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
-                    }catch(Exception $e){
-                        print("User have bad url or none". $br);    
-                        continue;
-                    }
+                $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
                 $events = $client->getEvents($start,$end);
                 foreach($events as $event_){
                     $obj = new CalDAVObject($event_->getHref(), $event_->getData(), $event_->getEtag());
-                    $file = fopen("data.ics","w+");
-                    fputs($file,$obj->getData(), strlen($obj->getData()));
-                    fclose($file);
                     $ical = new ical('data.ics');
                     $event = $ical->events();
                     if($uid == $event[0]["UID"]){
-                        print("EPESI to RADICALE edit event - ".$uid. $br);
                             $desc = "";
                             $status = $helper->set_access_status($record['permission']);
                             $new_data = helper::export($title,$desc, $cal_start_time, $cal_end_time,$uid,$status);
                             $obj = $client->change($obj->getHref(),$new_data,$obj->getEtag());
-                       // }
+                        //}
                     }
                 }
             }

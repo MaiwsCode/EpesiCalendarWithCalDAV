@@ -556,7 +556,8 @@ class iCalSyncCommon extends ModuleCommon {
                 try{
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 }catch(Exception $e){
-                    break;
+                    print("Bad user url".$br);
+                    continue;
                 }
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);

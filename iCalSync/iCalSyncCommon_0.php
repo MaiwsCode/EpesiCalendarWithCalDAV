@@ -35,7 +35,8 @@ class iCalSyncCommon extends ModuleCommon {
         $helper = new helper();
         $rbo = new RBO_RecordsetAccessor('contact');
         $users_urls = $rbo->get_records(array('!calendar_url' => ''));
-        foreach($users_urls as $user ){      
+        foreach($users_urls as $user ){    
+            try{  
             $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
             $arrayOfCalendars = $client->findCalendars(); 
             $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
@@ -180,6 +181,10 @@ class iCalSyncCommon extends ModuleCommon {
                 }
             } 
             fclose($fo);
+        }catch(Exception $e){
+            print("Bad user url".$br);
+            continue;
+        }
         }
     }
     // EPESI EVENTS --> SERVER
@@ -224,16 +229,16 @@ class iCalSyncCommon extends ModuleCommon {
             if($user->get_val('calendar_url') != ''){ 
                 try{
                     $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
-                    }catch(Exception $e){
-                        print("EPESI to RADICALE user dont have set url". $br);
-                        continue;
-                    }
-                $arrayOfCalendars = $client->findCalendars(); 
-                $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-                $create_new = $client->create(helper::export($sumary,$desc, $st, $end,$new_uid,$status));
-                $f = fopen('etags.txt','a');
-                fwrite($f, $new_uid."\n");
-                fclose($f);
+                    $arrayOfCalendars = $client->findCalendars(); 
+                    $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                    $create_new = $client->create(helper::export($sumary,$desc, $st, $end,$new_uid,$status));
+                    $f = fopen('etags.txt','a');
+                    fwrite($f, $new_uid."\n");
+                    fclose($f);
+                }catch(Exception $e){
+                    print("EPESI to RADICALE user dont have set url". $br);
+                    continue;
+            }
             }
         }
         Utils_RecordBrowserCommon::update_record('crm_meeting', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false); 
@@ -266,16 +271,16 @@ class iCalSyncCommon extends ModuleCommon {
             if($user->get_val('calendar_url') != ''){ 
                 try{
                     $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
-                    }catch(Exception $e){
-                        print("EPESI to RADICALE user dont have set url". $br);
-                        continue;
-                    }
-                $arrayOfCalendars = $client->findCalendars(); 
-                $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-                $create_new = $client->create(helper::export($sumary,$desc, $time, $time,$new_uid,$status));
-                $f = fopen('etags.txt','a');
-                fwrite($f, $new_uid."\n");
-                fclose($f);
+                    $arrayOfCalendars = $client->findCalendars(); 
+                    $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                    $create_new = $client->create(helper::export($sumary,$desc, $time, $time,$new_uid,$status));
+                    $f = fopen('etags.txt','a');
+                    fwrite($f, $new_uid."\n");
+                    fclose($f);
+                }catch(Exception $e){
+                    print("EPESI to RADICALE user dont have set url". $br);
+                    continue;
+                }
             }
         }
        Utils_RecordBrowserCommon::update_record('task', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
@@ -327,16 +332,16 @@ class iCalSyncCommon extends ModuleCommon {
                 $client = new SimpleCalDAVClient();
                 try{
                     $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
-                    }catch(Exception $e){
+                    $arrayOfCalendars = $client->findCalendars(); 
+                    $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                    $create_new = $client->create(helper::export($sumary,$desc, $day['date_and_time'], $day['date_and_time'],$new_uid,$status));
+                    $f = fopen('etags.txt','a');
+                    fwrite($f, $new_uid."\n");
+                    fclose($f);}
+                    catch(Exception $e){
                         print("EPESI to RADICALE user dont have set url". $br);
                         continue;
                     }
-                $arrayOfCalendars = $client->findCalendars(); 
-                $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-                $create_new = $client->create(helper::export($sumary,$desc, $day['date_and_time'], $day['date_and_time'],$new_uid,$status));
-                $f = fopen('etags.txt','a');
-                fwrite($f, $new_uid."\n");
-                fclose($f);
             }
         }
         Utils_RecordBrowserCommon::update_record('phonecall', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
@@ -353,10 +358,6 @@ class iCalSyncCommon extends ModuleCommon {
         foreach($users_urls as $user ){      
             try{
             $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
-            }catch(Exception $e){
-                print("EPESI to RADICALE user dont have set url". $br);
-                continue;
-            }
             $arrayOfCalendars = $client->findCalendars();     
             $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
             $start = $helper->get_date();
@@ -540,6 +541,10 @@ class iCalSyncCommon extends ModuleCommon {
                     }             
                 }
             }
+        }catch(Exception $e){
+            print("EPESI to RADICALE user dont have set url". $br);
+            continue;
+        }
         }
     }
     public static function delete($table,$record){
@@ -578,10 +583,6 @@ class iCalSyncCommon extends ModuleCommon {
             if($user->get_val('calendar_url') != ""){
                 try{
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
-                }catch(Exception $e){
-                    print("Bad user url".$br);
-                    continue;
-                }
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
                 $events = $client->getEvents($start,$end);
@@ -595,6 +596,10 @@ class iCalSyncCommon extends ModuleCommon {
                     if($uid == $event[0]["UID"]){
                         $client->delete($event_->getHref(),$event_->getEtag());
                     }
+                }
+                }catch(Exception $e){
+                    print("Bad user url".$br);
+                    continue;
                 }
             }
         }   
@@ -691,6 +696,7 @@ class iCalSyncCommon extends ModuleCommon {
         foreach($employes as $employer){
             $user = $rbo_user->get_record($employer);
             if($user->get_val('calendar_url') != ""){
+                try{
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 $arrayOfCalendars = $client->findCalendars(); 
                 $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
@@ -710,6 +716,10 @@ class iCalSyncCommon extends ModuleCommon {
                             $obj = $client->change($obj->getHref(),$new_data,$obj->getEtag());
                         //}
                     }
+                }
+                }catch(Exception $e){
+                    print("Bad user url".$br);
+                    continue;
                 }
             }
         }   

@@ -67,19 +67,14 @@ class iCalSyncCommon extends ModuleCommon {
                 $catch = $rbo_meet->get_records(array('uid' => $uid));
                 $catch2 = $rbo_phone->get_records(array('uid' => $uid));
                 $catch3 = $rbo_task->get_records(array('uid' => $uid));
-                if($catch != null || $catch2 != null || $catch3 != null){ $exist = true;}
-                $fo = file("etags.txt");
-                foreach($fo as $line) {
-                   $str =  substr($line,0,strlen($line)-1);
-                    if($str == $uid){
-                        $exist = true;
-                    }
-
-                }
+                if($catch != null or $catch2 != null or $catch3 != null){ $exist = true;}
                 if($exist == false){
+                    $description ="";
                     print($uid." doesnt exist - adding new ".$br);
                     if(isset($event[0]["DESCRIPTION"])){
                         $description = $event[0]["DESCRIPTION"];
+                       $description= str_replace('\n', '<br>', $description);
+                       print($description);
                     }
                     $start = $event[0]["DTSTART"];
                     $end = $event[0]["DTEND"];
@@ -97,7 +92,7 @@ class iCalSyncCommon extends ModuleCommon {
                     $id = $user->id;
                     print("RADICALE to EPESI adding event".$uid." ". $br);
                     $data = array('uid' => $uid, 'Title' => $summary, 'date' => $date,'time' => $start,
-                    'duration' => $duration,'status' => 0, 'priority' => '1', 'permission' => $status, 'Employees' => $id);
+                    'duration' => $duration,'status' => 0, 'priority' => '1', 'permission' => $status, 'Employees' => $id, 'Description'=> $description);
                     $event = $rbo_meet->new_record($data);
                     $event->created_by = $user->get_val('login');
                     $event->created_on = $now;           
@@ -111,8 +106,8 @@ class iCalSyncCommon extends ModuleCommon {
             $result = $client->GetEvents($start);
             $fo = file("etags.txt");
             $toRemove = array();
-          //  print(count($result));
           print("RADICALE to EPESI removing deleting events". $br);
+          print(count($result)."<BR>");
             for($y = 0;$y<count($fo);$y++){
                 $noone = true;
                 for($x = 0;$x<count($result);$x++){
@@ -124,7 +119,7 @@ class iCalSyncCommon extends ModuleCommon {
                     $event = $ical->events();
                     $uid = $event[0]["UID"];
                     $str1 = substr($fo[$y],0,strlen($fo[$y])-1);
-                   // print($str1 ."--". substr($fo[$y],0,strlen($fo[$y])-1)."<BR>");
+                     print($uid ."--". $str1."<BR>");
                     if($str1 == $uid){
                         $noone = true;
                         break;
@@ -136,8 +131,10 @@ class iCalSyncCommon extends ModuleCommon {
                 if($noone == false){
                     $toRemove[] = substr($fo[$y],0,strlen($fo[$y])-1);
                 }
+        }
+            foreach($toRemove as $R){
+                print("TO REMOVING: ".$R."<BR>");
             }
-            //print_r($toRemove);
             foreach($toRemove as $remove){
                 $DELETE = $remove;
                 $data = file("etags.txt");
@@ -158,22 +155,28 @@ class iCalSyncCommon extends ModuleCommon {
                     $rbo_meet =  new RBO_RecordsetAccessor('crm_meeting');
                     $id = str_replace("EPESIexportMeetings", "", $remove); 
                     $rbo_meet->delete_record($id);
+                    print("REMOVING ".$remove."<BR>");
                 }
                 else if (stripos($remove, "Tasks") !== false) {
                     $rbo_task =  new RBO_RecordsetAccessor('task');
                     $id = str_replace("EPESIexportTasks", "", $remove); 
                     $rbo_task->delete_record($id);
+                    print("REMOVING ".$remove."<BR>");
                 }
                 else if (stripos($remove, "Phones") !== false) {
                     $rbo_phone =  new RBO_RecordsetAccessor('phonecall');
                     $id = str_replace("EPESIexportPhones", "", $remove); 
                     $rbo_phone->delete_record($id);
+                    print("REMOVING ".$remove."<BR>");
                 }        
                 else {
                     $rbo_meet =  new RBO_RecordsetAccessor('crm_meeting');
                     $records = $rbo_meet->get_records(array('uid'=> $remove),array(),array());
                     foreach($records as $record){
-                    $rbo_meet->delete_record($record->id);}
+                        $rbo_meet->delete_record($record->id);
+                        print("REMOVING ".$remove."<BR>");
+                    }
+
                 }
             } 
             fclose($fo);
@@ -196,7 +199,7 @@ class iCalSyncCommon extends ModuleCommon {
         $created = $day->created_on;
         $extra_data = $day->to_array();
         $desc = $day->get_val('description');
-     //   $desc = str_replace("<br>", "  ", $desc);
+        $desc = str_replace('<br>', '\n', $desc);
         $sumary = $extra_data["title"];
         $st = $day['time'];
         $end = null;
@@ -369,6 +372,7 @@ class iCalSyncCommon extends ModuleCommon {
                 $summary = $event[0]["SUMMARY"]; 
                 $uid = $event[0]["UID"];
                 $start = $event[0]["DTSTART"];
+                $desc = $event[0]["DESCRIPTION"];
                 $end = $event[0]["DTEND"];
                 $status = null;
                 if(isset($event[0]["CLASS"])){
@@ -406,12 +410,13 @@ class iCalSyncCommon extends ModuleCommon {
                     if($summary != $get_event['title']){$change = true; }
                     if($start != $get_event['time']){$change = true; }
                     if($duration != $get_event['duration']){$change = true;}
+                    if($desc != $get_event['description']){$change = true;}
                     if(intval($status) !=intval($get_event['permission'])){$change = true; }
                     if($change == true){
                         print("UPDATING - ".$uid." ".$br);
                         Utils_RecordBrowserCommon::update_record('crm_meeting', $id, array('uid' => $uid,
                     'title' => $summary,'date' => $date,'time' => $start,
-                    'duration' => $duration,'status' => 0, 'priority' => '1',
+                    'duration' => $duration,'status' => 0, 'priority' => '1','description'=>$desc = str_replace('\n','<br>',$desc),
                      'permission' => $status),$full_update=false, $date=null, $dont_notify=false);
                     } else{
                         print("No changes - no update".$br);
@@ -454,7 +459,9 @@ class iCalSyncCommon extends ModuleCommon {
                         $phonenumber =  $x->get_val('phone'); 
                         }
                     }
-
+                    if($desc != $get_event['description']){
+                        $change = true; 
+                    }
                     $sum = $get_event['subject']." TEL: ".$phonenumber." - ".$who;
                     if($summary != $sum){
                         $change = true; 
@@ -473,7 +480,7 @@ class iCalSyncCommon extends ModuleCommon {
                             print("UPDATING ".$uid." ".$br);
                             Utils_RecordBrowserCommon::update_record('phonecall', $id, array('uid' => $uid,
                             'subject' => $summary,'date_and_time' => $start,
-                            'status' => 0, 'priority' => '1',
+                            'status' => 0, 'priority' => '1','description'=> $desc = str_replace('\n','<br>',$desc),
                              'permission' => $status
                         ),$full_update=false, $date=null, $dont_notify=false);
                 }
@@ -481,7 +488,7 @@ class iCalSyncCommon extends ModuleCommon {
                     print("UPDATING ".$uid." ".$br);
                     Utils_RecordBrowserCommon::update_record('phonecall', $id, array('uid' => $uid,
                        'date_and_time' => $start,
-                        'status' => 0, 'priority' => '1',
+                        'status' => 0, 'priority' => '1','description'=>$desc,
                          'permission' => $status
                     ),$full_update=false, $date=null, $dont_notify=false);
                 }
@@ -504,6 +511,7 @@ class iCalSyncCommon extends ModuleCommon {
                         $start = $date." 12:00:00";
                         $without = 0;
                     }
+                    if($desc != $get_event['description']){$change = true;}
                 if($summary != $get_event['title']){$change = true;
                  //print(" CHANGING TITLE <BR>"); 
                 }
@@ -518,13 +526,13 @@ class iCalSyncCommon extends ModuleCommon {
                         print("UPDATING ".$uid.$br);
                     Utils_RecordBrowserCommon::update_record('task', $id, array('uid' => $uid,
                     'title' => $summary,'deadline' => $start,'timeless' => '1',
-                    'status' => 0, 'priority' => '1',
+                    'status' => 0, 'priority' => '1','description'=>$desc,
                     'permission' => $status),$full_update=false, $date=null, $dont_notify=false);
                       }else{
                         print("UPDATING ".$uid.$br);
                             Utils_RecordBrowserCommon::update_record('task', $id, array('uid' => $uid,
                             'title' => $summary,'deadline' => $start,'timeless' => '0',
-                            'status' => 0, 'priority' => '1',
+                            'status' => 0, 'priority' => '1','description'=>$desc,
                             'permission' => $status),$full_update=false, $date=null, $dont_notify=false);     
                         }
                     }else{
@@ -602,8 +610,7 @@ class iCalSyncCommon extends ModuleCommon {
         $title = "";
         $cal_start_time = "";
         $cal_end_time = "";
-        switch($table){
-            case "phonecall":
+        if($table ==  "phonecall"){
                 $start = $record['date_and_time'];
                 $cal_start_time = $record['date_and_time'];
                 $cal_end_time = $record['date_and_time'];
@@ -636,8 +643,8 @@ class iCalSyncCommon extends ModuleCommon {
                     }
                 }
                 $title = $record["subject"]." TEL: ".$phonenumber. " - ".$who;
-            break;
-            case "task":
+            }
+            if( $table == "task"){ 
                 $start = $record['deadline'];
                 $start = strtotime($start);
                 $e = $start;
@@ -657,8 +664,8 @@ class iCalSyncCommon extends ModuleCommon {
                    $cal_start_time = ($record['deadline']);
                    $cal_end_time = $cal_start_time;
                 }
-            break;
-            case "crm_meeting":
+            }
+            if( $table == "crm_meeting"){ 
                 $start = $record['date'];
                 $start = strtotime($start);
                 $end = $start + (60*60*24*14);
@@ -679,8 +686,7 @@ class iCalSyncCommon extends ModuleCommon {
                     $time = $helper->calc_duration($cal_start_time, $cal_end_time);
                     $cal_end_time = $helper->toDateTimeCAL($time);
                 }
-            break;
-        }
+            }
         $employes = $record["employees"];
         foreach($employes as $employer){
             $user = $rbo_user->get_record($employer);
@@ -691,10 +697,14 @@ class iCalSyncCommon extends ModuleCommon {
                 $events = $client->getEvents($start,$end);
                 foreach($events as $event_){
                     $obj = new CalDAVObject($event_->getHref(), $event_->getData(), $event_->getEtag());
+                    $file = fopen("data.ics","w+");
+                    fputs($file,$obj->getData(), strlen($obj->getData()));
+                    fclose($file);
                     $ical = new ical('data.ics');
                     $event = $ical->events();
                     if($uid == $event[0]["UID"]){
-                            $desc = "";
+                            $desc = $record['description'];
+                            $desc = str_replace('\n','<br>', $desc);
                             $status = $helper->set_access_status($record['permission']);
                             $new_data = helper::export($title,$desc, $cal_start_time, $cal_end_time,$uid,$status);
                             $obj = $client->change($obj->getHref(),$new_data,$obj->getEtag());

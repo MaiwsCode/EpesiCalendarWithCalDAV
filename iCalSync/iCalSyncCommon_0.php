@@ -68,7 +68,28 @@ class iCalSyncCommon extends ModuleCommon {
                 $catch = $rbo_meet->get_records(array('uid' => $uid));
                 $catch2 = $rbo_phone->get_records(array('uid' => $uid));
                 $catch3 = $rbo_task->get_records(array('uid' => $uid));
-                if($catch != null or $catch2 != null or $catch3 != null){ $exist = true;}
+                if($catch != null or $catch2 != null or $catch3 != null){ 
+                    $exist = true;
+                }
+                if($catch != null || $catch2 != null || $catch3 != null){ 
+                    $exist = true;
+                }
+                if(count($catch) > 0){
+                    $exist = true;
+                }
+                if(count($catch2) > 0){
+                    $exist = true;
+                }
+                if(count($catch3) > 0){
+                    $exist = true;
+                }
+                $data = file("etags.txt");
+                foreach($data as $line) {
+                    if(trim($line) == $uid){
+                        $exist = true;
+                    }
+                }
+                fclose($data);
                 if($exist == false){
                     $description ="";
                     print($uid." doesnt exist - adding new ".$br);
@@ -88,7 +109,6 @@ class iCalSyncCommon extends ModuleCommon {
                         $end = $helper->convert_date_time($end);
                         $duration = $helper->duration($start, $end);
                     }
-                    $str1 = substr($fo[$y],0,strlen($fo[$y])-1);
                     $now = date("Y-m-d H:i:s");
                     $id = $user->id;
                     print("RADICALE to EPESI adding event".$uid." ". $br);

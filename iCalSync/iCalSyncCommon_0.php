@@ -39,7 +39,11 @@ class iCalSyncCommon extends ModuleCommon {
             try{  
             $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
             $arrayOfCalendars = $client->findCalendars(); 
-            $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+            if(count($arrayOfCalendars)>0){
+                $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+            }else{
+                continue;
+            }
             $start = $helper->get_date();
             $result = $client->GetEvents($start);
             for( $i = 0; $i < count($result); $i++) {
@@ -250,7 +254,11 @@ class iCalSyncCommon extends ModuleCommon {
                 try{
                     $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                     $arrayOfCalendars = $client->findCalendars(); 
-                    $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                    if(count($arrayOfCalendars)>0){
+                        $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                    }else{
+                        continue;
+                    }
                     $create_new = $client->create(helper::export($sumary,$desc, $st, $end,$new_uid,$status));
                     $f = fopen('etags.txt','a');
                     fwrite($f, $new_uid."\n");
@@ -292,7 +300,11 @@ class iCalSyncCommon extends ModuleCommon {
                 try{
                     $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                     $arrayOfCalendars = $client->findCalendars(); 
-                    $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                    if(count($arrayOfCalendars)>0){
+                        $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                    }else{
+                        continue;
+                    }
                     $create_new = $client->create(helper::export($sumary,$desc, $time, $time,$new_uid,$status));
                     $f = fopen('etags.txt','a');
                     fwrite($f, $new_uid."\n");
@@ -353,7 +365,11 @@ class iCalSyncCommon extends ModuleCommon {
                 try{
                     $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                     $arrayOfCalendars = $client->findCalendars(); 
-                    $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                    if(count($arrayOfCalendars)>0){
+                        $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                    }else{
+                        continue;
+                    }
                     $create_new = $client->create(helper::export($sumary,$desc, $day['date_and_time'], $day['date_and_time'],$new_uid,$status));
                     $f = fopen('etags.txt','a');
                     fwrite($f, $new_uid."\n");
@@ -379,7 +395,12 @@ class iCalSyncCommon extends ModuleCommon {
             try{
             $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
             $arrayOfCalendars = $client->findCalendars();     
-            $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+            if(count($arrayOfCalendars)>0){
+                $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+            }
+            else{
+                continue;
+            }
             $start = $helper->get_date();
             $result = $client->GetEvents($start);
             for( $i = 0; $i < count($result); $i++) {
@@ -489,13 +510,13 @@ class iCalSyncCommon extends ModuleCommon {
                         print("CHANGING SUMMARY <BR>"); 
                         print("$sum :: $summary <BR>"); 
                     }
-                if($start != $get_event['date_and_time']){
-                     $change = true;
-                     print("CHANGING TIME <BR>");
-                     print("$start :: ".$get_event['date_and_time']." <BR>");
-                }
-                if(intval($status) != intval($get_event['permission'])){
-                    $change = true;  print("CHANGING PERMISSION <BR>"); }
+                    if($start != $get_event['date_and_time']){
+                        $change = true;
+                        print("CHANGING TIME <BR>");
+                        print("$start :: ".$get_event['date_and_time']." <BR>");
+                    }
+                    if(intval($status) != intval($get_event['permission'])){
+                        $change = true;  print("CHANGING PERMISSION <BR>"); }
                     if($change == true){
                         if($summary != $sum ){
                             print("UPDATING ".$uid." ".$br);
@@ -504,24 +525,24 @@ class iCalSyncCommon extends ModuleCommon {
                             'status' => 0, 'priority' => '1','description'=> $desc = str_replace('\n','<br>',$desc),
                              'permission' => $status
                         ),$full_update=false, $date=null, $dont_notify=false);
+                        }
+                        else{
+                            print("UPDATING ".$uid." ".$br);
+                            Utils_RecordBrowserCommon::update_record('phonecall', $id, array('uid' => $uid,
+                            'date_and_time' => $start,
+                                'status' => 0, 'priority' => '1','description'=>$desc,
+                                'permission' => $status
+                            ),$full_update=false, $date=null, $dont_notify=false);
+                        }
+                    }else{
+                        print("No changes - no update ".$br);
+                    }     
                 }
-                else{
-                    print("UPDATING ".$uid." ".$br);
-                    Utils_RecordBrowserCommon::update_record('phonecall', $id, array('uid' => $uid,
-                       'date_and_time' => $start,
-                        'status' => 0, 'priority' => '1','description'=>$desc,
-                         'permission' => $status
-                    ),$full_update=false, $date=null, $dont_notify=false);
-                }
-            }else{
-                print("No changes - no update ".$br);
-            }     
-        }
                 if($catch3 != null){
                     print("UPDATING - tasks ".$br);
                     $get_event = $rbo_task->get_records(array("uid" => $uid));
                     foreach($get_event as $ev){
-                       $get_event = $ev;
+                        $get_event = $ev;
                     }
                     $id = $get_event['id'];
                     $change = false;
@@ -532,25 +553,27 @@ class iCalSyncCommon extends ModuleCommon {
                         $start = $date." 12:00:00";
                         $without = 0;
                     }
-                    if($desc != $get_event['description']){$change = true;}
-                if($summary != $get_event['title']){$change = true;
-                 //print(" CHANGING TITLE <BR>"); 
-                }
-            if($start != $get_event['deadline']){$change = true;
-            // print(" CHANGING TIME <BR>");
-        }
-        if(intval($status) !=intval($get_event['permission'])){$change = true;
-        // print(" CHANGING STATUS <BR>");
-}
+                    if($desc != $get_event['description']){
+                        $change = true;
+                    }
+                    if($summary != $get_event['title']){
+                        $change = true;
+                    }
+                    if($start != $get_event['deadline']){
+                        $change = true;
+                    }
+                    if(intval($status) !=intval($get_event['permission'])){
+                        $change = true;     
+                    }
                     if($change == true){
-                    if($without == 0){
-                        print("UPDATING ".$uid.$br);
-                    Utils_RecordBrowserCommon::update_record('task', $id, array('uid' => $uid,
-                    'title' => $summary,'deadline' => $start,'timeless' => '1',
-                    'status' => 0, 'priority' => '1','description'=>$desc,
-                    'permission' => $status),$full_update=false, $date=null, $dont_notify=false);
-                      }else{
-                        print("UPDATING ".$uid.$br);
+                        if($without == 0){
+                            print("UPDATING ".$uid.$br);
+                            Utils_RecordBrowserCommon::update_record('task', $id, array('uid' => $uid,
+                            'title' => $summary,'deadline' => $start,'timeless' => '1',
+                            'status' => 0, 'priority' => '1','description'=>$desc,
+                            'permission' => $status),$full_update=false, $date=null, $dont_notify=false);
+                        }else{
+                            print("UPDATING ".$uid.$br);
                             Utils_RecordBrowserCommon::update_record('task', $id, array('uid' => $uid,
                             'title' => $summary,'deadline' => $start,'timeless' => '0',
                             'status' => 0, 'priority' => '1','description'=>$desc,
@@ -565,8 +588,8 @@ class iCalSyncCommon extends ModuleCommon {
             print("EPESI to RADICALE user dont have set url". $br);
             continue;
         }
-        }
     }
+}
     public static function delete($table,$record){
         $client = new SimpleCalDAVClient();
         $helper = new helper();
@@ -604,7 +627,12 @@ class iCalSyncCommon extends ModuleCommon {
                 try{
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 $arrayOfCalendars = $client->findCalendars(); 
-                $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                if(count($arrayOfCalendars)>0){
+                    $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                }
+                else{
+                    continue;
+                }
                 $events = $client->getEvents($start,$end);
                 foreach($events as $event_){
                     $obj = new CalDAVObject($event_->getHref(), $event_->getData(), $event_->getEtag());
@@ -719,7 +747,9 @@ class iCalSyncCommon extends ModuleCommon {
                 try{
                 $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                 $arrayOfCalendars = $client->findCalendars(); 
-                $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                if(count($arrayOfCalendars)>0){
+                    $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                }
                 $events = $client->getEvents($start,$end);
                 foreach($events as $event_){
                     $obj = new CalDAVObject($event_->getHref(), $event_->getData(), $event_->getEtag());

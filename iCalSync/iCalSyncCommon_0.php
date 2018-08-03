@@ -13,9 +13,9 @@ require 'client/helper.php';
 class iCalSyncCommon extends ModuleCommon {
 
 
-    public static function menu() {
-        return array('iCal'=>array());
-    }
+    public static function user_settings() {
+        return array("iCalSync"=> 'settings');
+     }
 
     public static function cron() {
         return array(
@@ -23,11 +23,7 @@ class iCalSyncCommon extends ModuleCommon {
            'update_changes' => 3,
         );
     }
-    public static function version(){
-        return "UPDATE 1";
-    }
 
-     // SERVER -> EPESI
    public static function update() {
         $br = "<BR>";
         $client = new SimpleCalDAVClient();

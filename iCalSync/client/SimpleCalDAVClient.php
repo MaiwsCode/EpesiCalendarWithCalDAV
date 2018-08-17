@@ -264,7 +264,7 @@ class SimpleCalDAVClient {
 		if(count($result) == 0) throw new CalDAVException('Can\'t find '.$href.'on server', $this->client);
 		
 		// $etag correct?
-		if($result[0]['etag'] != $etag) { throw new CalDAVException('Wrong entity tag. The entity seems to have changed.', $this->client); }
+		//if($result[0]['etag'] != $etag) { throw new CalDAVException('Wrong entity tag. The entity seems to have changed.', $this->client); }
 	
 		// Do the deletion
 		$this->client->DoDELETERequest($href, $etag);

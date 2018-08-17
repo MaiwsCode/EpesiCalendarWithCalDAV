@@ -12,780 +12,562 @@ require 'client/helper.php';
 
 class iCalSyncCommon extends ModuleCommon {
 
-
     public static function user_settings() {
         return array("iCalSync"=> 'settings');
      }
 
     public static function cron() {
         return array(
-           'update' => 2, 
-           'update_changes' => 3,
+           'insert_from_server' => 2, 
+           'update_changes_from_server' => 3,
         );
     }
 
-   public static function update() {
-        $br = "<BR>";
-        $client = new SimpleCalDAVClient();
-        print("RADICALE to EPESI download events". $br);
+
+    public static function insert_from_server() {
+        unlink('data.ics');
         $helper = new helper();
         $rbo = new RBO_RecordsetAccessor('contact');
+        $rbo_meet = new RBO_RecordsetAccessor('crm_meeting');
+        $rbo_cal_events = new RBO_RecordsetAccessor('calendar_sync');
         $users_urls = $rbo->get_records(array('!calendar_url' => ''));
+        $list_of_uid = array();
         foreach($users_urls as $user ){    
+            $client = new SimpleCalDAVClient();
+            $correct_url = false;
             try{  
-            $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
-            $arrayOfCalendars = $client->findCalendars(); 
-            if(count($arrayOfCalendars)>0){
-                $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-            }else{
-                continue;
-            }
-            $start = $helper->get_date();
-            $result = $client->GetEvents($start);
-            for( $i = 0; $i < count($result); $i++) {
-                $exist = false;
-                $obj = new CalDAVObject($result[$i]->getHref(), $result[$i]->getData(), $result[$i]->getEtag());
-                $file = fopen("data.ics","w+");
-                fputs($file,$obj->getData(), strlen($obj->getData()));
-                fclose($file);
-                $ical = new ical('data.ics');
-                $event = $ical->events();
-                $summary = $event[0]["SUMMARY"]; 
-                $uid = $event[0]["UID"];
-                $time = $event[0]["DTSTART"];
-                $status = null;
-                if(isset($event[0]["CLASS"])){
-                    $status = $event[0]["CLASS"];          
-                }
-                if($status == null){
-                    $status = "PUBLIC";
-                }
-                $status = $helper->set_access_status_numeric($status);
-                $time = $helper->convert_date_time($time);
-                $rbo_meet =  new RBO_RecordsetAccessor('crm_meeting');
-                $rbo_phone =  new RBO_RecordsetAccessor('phonecall');
-                $rbo_task =  new RBO_RecordsetAccessor('task');
-                $catch = $rbo_meet->get_records(array('uid' => $uid));
-                $catch2 = $rbo_phone->get_records(array('uid' => $uid));
-                $catch3 = $rbo_task->get_records(array('uid' => $uid));
-                if($catch != null or $catch2 != null or $catch3 != null){ 
-                    $exist = true;
-                }
-                if($catch != null || $catch2 != null || $catch3 != null){ 
-                    $exist = true;
-                }
-                if(count($catch) > 0){
-                    $exist = true;
-                }
-                if(count($catch2) > 0){
-                    $exist = true;
-                }
-                if(count($catch3) > 0){
-                    $exist = true;
-                }
-                $data = file("etags.txt");
-                foreach($data as $line) {
-                    if(trim($line) == $uid){
-                        $exist = true;
-                    }
-                }
-                fclose($data);
-                if($exist == false){
-                    $description ="";
-                    print($uid." doesnt exist - adding new ".$br);
-                    if(isset($event[0]["DESCRIPTION"])){
-                        $description = $event[0]["DESCRIPTION"];
-                       $description= str_replace('\n', '<br>', $description);
-                       print($description);
-                    }
-                    $start = $event[0]["DTSTART"];
-                    $end = $event[0]["DTEND"];
-                    $date = $helper->convert_date($start);
-                    $start = $helper->convert_date_time($start);
-                    if($start == ''){
-                        $start = null;
-                        $duration = -1;
-                    }else{
-                        $end = $helper->convert_date_time($end);
-                        $duration = $helper->duration($start, $end);
-                    }
-                    $now = date("Y-m-d H:i:s");
-                    $id = $user->id;
-                    print("RADICALE to EPESI adding event".$uid." ". $br);
-                    $data = array('uid' => $uid, 'Title' => $summary, 'date' => $date,'time' => $start,
-                    'duration' => $duration,'status' => 0, 'priority' => '1', 'permission' => $status, 'Employees' => $id, 'Description'=> $description);
-                    $event = $rbo_meet->new_record($data);
-                    $event->created_by = $user->get_val('login');
-                    $event->created_on = $now;           
-                    $event->save();      
-                    $f = fopen('etags.txt','a');
-                    fwrite($f, $uid."\n");
-                    fclose($f);
+                $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+                $arrayOfCalendars = $client->findCalendars(); 
+                if(count($arrayOfCalendars)>0){
+                    $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                    $correct_url = true;
+                }else{
                 }
             }
-            $start = $helper->get_date();
-            $result = $client->GetEvents($start);
-            $fo = file("etags.txt");
-            $toRemove = array();
-          print("RADICALE to EPESI removing deleting events". $br);
-          print(count($result)."<BR>");
-            for($y = 0;$y<count($fo);$y++){
-                $noone = true;
-                for($x = 0;$x<count($result);$x++){
-                    $obj = new CalDAVObject($result[$x]->getHref(), $result[$x]->getData(), $result[$x]->getEtag());
+            catch(Exception $e){}
+            if($correct_url){
+                $start = $helper->get_date();
+                $result = $client->GetEvents($start);
+                for( $i = 0; $i < count($result); $i++) {
+                    $exist = false;
+                    $obj = new CalDAVObject($result[$i]->getHref(), $result[$i]->getData(), $result[$i]->getEtag());
                     $file = fopen("data.ics","w+");
                     fputs($file,$obj->getData(), strlen($obj->getData()));
                     fclose($file);
                     $ical = new ical('data.ics');
                     $event = $ical->events();
                     $uid = $event[0]["UID"];
-                    $str1 = substr($fo[$y],0,strlen($fo[$y])-1);
-                     print($uid ."--". $str1."<BR>");
-                    if($str1 == $uid){
-                        $noone = true;
+                    $list_of_uid[] = $uid;
+                    $cal_events = $rbo_cal_events->get_records(array('uid'=>$uid),array(),array());
+                    if(count($cal_events) > 0){
+                        print("Ten event już istnieje <BR>");
+                    }
+                    else{
+                        print("Nowy event! <BR>");
+                        $summary = $event[0]["SUMMARY"]; 
+                        $time = $event[0]["DTSTART"];
+                        $status = null;
+                        if(isset($event[0]["CLASS"])){
+                             $status = $event[0]["CLASS"];          
+                        }
+                        if($status == null){
+                            $status = "PUBLIC";
+                        }   
+                        $status = $helper->set_access_status_numeric($status);
+                        $time = $helper->convert_date_time($time);
+                        $description ="";
+                        if(isset($event[0]["DESCRIPTION"])){
+                            $description = $event[0]["DESCRIPTION"];
+                            $description= str_replace('\n', '<br>', $description);
+                        }
+                        $start = $event[0]["DTSTART"];
+                        $end = $event[0]["DTEND"];
+                        $date = $helper->convert_date($start);
+                        $start = $helper->convert_date_time($start);
+                        if($start == ''){
+                            $start = null;
+                            $duration = -1;
+                        }else{
+                            $end = $helper->convert_date_time($end);
+                            $duration = $helper->duration($start, $end);
+                        }
+                        $now = date("Y-m-d H:i:s");
+                        $user_id = $user->id;
+                        $data = array('uid' => $uid, 'Title' => $summary, 'date' => $date,'time' => $start,
+                        'duration' => $duration,'status' => 0, 'priority' => '1', 'permission' => $status, 'Employees' => $user_id, 'Description'=> $description);
+                        $event = $rbo_meet->new_record($data);
+                        $event->created_by = $user->get_val('login');
+                        $event->created_on = $now;           
+                        $event->save();   
+                        print_r($event);
+                        $data = array('uid' => $uid, 'table name' => 'crm_meeting', 'event_id' => $event->id, 'etag' => $result[$i]->getEtag(), 'href' => $result[$i]->getHref() );
+                        $events_list = $rbo_cal_events->new_record($data);
+                        $events_list->created_by = $user->get_val('login');
+                        $events_list->created_on = $now;    
+                        $events_list->save();
+                    }
+                }
+            }
+            $to_remove = array();
+            $cal_events = $rbo_cal_events->get_records(array('!uid' => ''),array(),array());
+            foreach($cal_events as $cal_event){
+                $exist = true;
+                foreach($list_of_uid as $uid){
+                    if($cal_event['uid'] == $uid){
+                        $exist = true;
                         break;
                     }
                     else{
-                        $noone = false;
+                        $exist = false;
                     }
                 }
-                if($noone == false){
-                    $toRemove[] = substr($fo[$y],0,strlen($fo[$y])-1);
+                if($exist == false){
+                    array_push($to_remove, array('id' => $cal_event->id, 'table' => $cal_event['table name'] ,'event_id' => $cal_event['event_id']));
                 }
-        }
-            foreach($toRemove as $R){
-                print("TO REMOVING: ".$R."<BR>");
             }
-            foreach($toRemove as $remove){
-                $DELETE = $remove;
-                $data = file("etags.txt");
-                $out = array();
-                foreach($data as $line) {
-                    if(trim($line) != $DELETE) {
-                        $out[] = $line;
-                    }
-                }
-                $fp = fopen("etags.txt", "w+");
-                flock($fp, LOCK_EX);
-                foreach($out as $line) {
-                    fwrite($fp, $line);
-                }
-                flock($fp, LOCK_UN);
-                fclose($fp);  
-                if (stripos($remove, "Meetings") !== false) {
-                    $rbo_meet =  new RBO_RecordsetAccessor('crm_meeting');
-                    $id = str_replace("EPESIexportMeetings", "", $remove); 
-                    $rbo_meet->delete_record($id);
-                    print("REMOVING ".$remove."<BR>");
-                }
-                else if (stripos($remove, "Tasks") !== false) {
-                    $rbo_task =  new RBO_RecordsetAccessor('task');
-                    $id = str_replace("EPESIexportTasks", "", $remove); 
-                    $rbo_task->delete_record($id);
-                    print("REMOVING ".$remove."<BR>");
-                }
-                else if (stripos($remove, "Phones") !== false) {
-                    $rbo_phone =  new RBO_RecordsetAccessor('phonecall');
-                    $id = str_replace("EPESIexportPhones", "", $remove); 
-                    $rbo_phone->delete_record($id);
-                    print("REMOVING ".$remove."<BR>");
-                }        
-                else {
-                    $rbo_meet =  new RBO_RecordsetAccessor('crm_meeting');
-                    $records = $rbo_meet->get_records(array('uid'=> $remove),array(),array());
-                    foreach($records as $record){
-                        $rbo_meet->delete_record($record->id);
-                        print("REMOVING ".$remove."<BR>");
-                    }
-
-                }
-            } 
-            fclose($fo);
-        }catch(Exception $e){
-            print("Bad user url".$br);
-            continue;
-        }
+            foreach($to_remove as $remove){
+                $rbo_cal_events->delete_record($remove['id']);
+                $remove_event = new RBO_RecordsetAccessor($remove['table']);
+                $remove_event->delete_record($remove["event_id"]);
+                print("Removing event ".$remove['id']." <BR>");
+            }
         }
     }
-    // EPESI EVENTS --> SERVER
-    public static function push_events(){
-        $br = "<BR>";
-        print("EPESI to RADICALE push events". $br);
+    public static function update_changes_from_server(){
         $helper = new helper();
-        $date = date_create(date('Y-m-d'));
-        date_sub($date, date_interval_create_from_date_string('14 days'));
-        $date =  date_format($date, 'Y-m-d');
         $rbo = new RBO_RecordsetAccessor('contact');
-        $client = new SimpleCalDAVClient();
-        $rbo_meet =  new RBO_RecordsetAccessor('crm_meeting');
-        $get_days = $rbo_meet->get_records(array('>=date' => $date,'uid' => ''));
-        //for meetings
-        foreach($get_days as $day){   
-        $created = $day->created_on;
-        $extra_data = $day->to_array();
-        $desc = $day->get_val('description');
-        $desc = str_replace('<br>', '\n', $desc);
-        $sumary = $extra_data["title"];
-        $st = $day['time'];
-        $end = null;
-        if($st == null){
-            $st = $day['date'];
-            $end = $day['date'];
-        }
-        if($end == null){
-            $end = $extra_data['duration'];  
-            $time = $helper->calc_duration($st, $end);
-            $end = $helper->toDateTimeCAL($time);
-        }
-        $new_uid = "EPESIexportMeetings".$day->id;
-        $new_uid = str_replace(" ", "", $new_uid);
-        $created = $helper->toDateTimeCAL($created)."Z";
-        $employes = $extra_data["employees"];
-        $status = $extra_data['permission'];
-        $status = $helper->set_access_status($status);
-        foreach ($employes as $employer ){
+        $rbo_cal_events = new RBO_RecordsetAccessor('calendar_sync');
+        $users = $rbo->get_records(array('!calendar_url' => ''),array(),array());
+        print("<BR>".count($users)." użytkownikow do przejrzenia<BR>");
+        foreach ($users as $user){
+            $_user = $rbo->get_record($user->id);
+            $name = $_user->get_val('login',$nolink=True);
+            $client = new SimpleCalDAVClient();
+            $correct_url = false;
+                try{  
+                    $client->connect($_user['calendar_url'], $name,$_user["cal_password"]);
+                    $arrayOfCalendars = $client->findCalendars(); 
+                    if(count($arrayOfCalendars)>0){
+                        $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($_user['calendar_url'])]);
+                        $correct_url = true;
+                    }else{
+                    }
+                }
+                catch(Exception $e){}
+                if($correct_url){
+                    print("Przeglądam kalendarz dla użytkownika ".$name);
+                    $start = $helper->get_date();
+                    $result = $client->GetEvents($start);
+                    print("<BR> EVENTÓW: ".count($result));
+                    for( $i = 0; $i < count($result); $i++) {
+                        $event = $rbo_cal_events->get_records(array('etag'=> $result[$i]->getEtag()),array(),array());
+                        if(count($event) <= 0){
+                            print("EVENT się nie zgadza<BR>");
+                            // otrzymuje ktory event zmienic
+                            $events = $rbo_cal_events->get_records(array('href'=> $result[$i]->getHref()),array(),array());
+                            foreach($events as $event){
+                                print("Zmiana eventu ".$event['event_id']." ".$event['etag']."<BR>");
+                                //sprawdzam jaki to typ eventu 
+                                $event_type = $event['table_name'];
+                                $changes = new RBO_RecordsetAccessor($event_type);
+                                $obj = new CalDAVObject($result[$i]->getHref(), $result[$i]->getData(), $result[$i]->getEtag());
+                                $file = fopen("data.ics","w+");
+                                fputs($file,$obj->getData(), strlen($obj->getData()));
+                                fclose($file);
+                                $ical = new ical('data.ics');
+                                $_event = $ical->events();
+                                $summary = $_event[0]["SUMMARY"]; 
+                                $time = $_event[0]["DTSTART"];
+                                $status = null;
+                                if(isset($_event[0]["CLASS"])){
+                                    $status = $_event[0]["CLASS"];          
+                                }
+                                if($status == null){
+                                    $status = "PUBLIC";
+                                }   
+                                $status = $helper->set_access_status_numeric($status);
+                                $time = $helper->convert_date_time($time);
+                                $description ="";
+                                if(isset($_event[0]["DESCRIPTION"])){
+                                    $description = $_event[0]["DESCRIPTION"];
+                                    $description= str_replace('\n', '<br>', $description);
+                                }
+                                $start = $_event[0]["DTSTART"];
+                                if($event_type == 'crm_meeting'){
+                                    $start = $_event[0]["DTSTART"];
+                                    $end = $_event[0]["DTEND"];
+                                    $_date = $helper->convert_date($start);
+                                    $start = $helper->convert_date_time($start);
+                                    if($start == ''){
+                                        $start = null;
+                                        $duration = -1;
+                                    }else{
+                                        $end = $helper->convert_date_time($end);
+                                        $duration = $helper->duration($start, $end);
+                                    }
+                                    Utils_RecordBrowserCommon::update_record('calendar_sync', $event->id, 
+                                        array('etag' => $result[$i]->getEtag(),'href'=> $result[$i]->getHref()),
+                                        $full_update=false, 
+                                        $date=null, 
+                                        $dont_notify=false);    
+                                    $succes = $changes->update_record($event['event_id'], array(
+                                        'date' => $_date, 
+                                        'time' => $start ,
+                                        'title' => $summary,
+                                        'duration' => $duration,
+                                        'permission' => $status,
+                                        'description'=>$desc,
+                                    ));
+                                    print("Aktualizacja zakończona". $success);
+                                }
+                                if($event_type == 'task'){
+                                    $_date = $helper->convert_date($start);
+                                    $start = $helper->convert_date_time($start);
+                                    $without = 0;
+                                    if($start == ''){
+                                        $start = $_date." 12:00:00";
+                                        $without = 1;
+                                    }
+                                    Utils_RecordBrowserCommon::update_record('calendar_sync', $event->id, 
+                                    array('etag' => $result[$i]->getEtag(),'href'=> $result[$i]->getHref()),
+                                    $full_update=false, 
+                                    $date=null, 
+                                    $dont_notify=false);    
+                                    $succes = $changes->update_record($event['event_id'], array(
+                                        'deadline' => $start,
+                                        'title' => $summary,
+                                        'timeless' => $without,
+                                        'permission' => $status,
+                                        'description'=>$desc,
+                                    ));
+                                print("Aktualizacja zakończona". $success);
+                                }
+                                if($event_type == 'phonecall'){
+                                    $start = $_event[0]["DTSTART"];
+                                    $start = $helper->convert_date_time($start);
+                                    if($start == ''){
+                                        $start =  $helper->convert_date($_event[0]["DTSTART"])." 12:00:00";
+                                        $end = $start;
+                                    }
+                                    $end = $start;
+                                    Utils_RecordBrowserCommon::update_record('calendar_sync', $event->id, 
+                                    array('etag' => $result[$i]->getEtag(),'href'=> $result[$i]->getHref()),
+                                    $full_update=false, 
+                                    $date=null, 
+                                    $dont_notify=false);    
+                                $succes = $changes->update_record($event['event_id'], array(
+                                    'subject' => $summary,
+                                    'date_and_time' => $start,
+                                    'permission' => $status,
+                                    'description'=>$desc,
+                                ));
+                                print("Aktualizacja zakończona". $success);
+                                }
+                                //wprowadzam zmiany na epesi
+                                //aktualizuje etag 
+                            }
+                        }
+                    }
+                }
+            }
+        
+    }
+    public static function event_to_server($record,$table){
+        $helper = new helper();
+        $rbo_event = new RBO_RecordsetAccessor($table);
+        $rbo_cal_events = new RBO_RecordsetAccessor('calendar_sync');
+        $users = $record['employees'];
+        foreach ($users as $employer){
             $rbo = new RBO_RecordsetAccessor('contact');
+            $client = new SimpleCalDAVClient();
             $user = $rbo->get_record($employer);
             if($user->get_val('calendar_url') != ''){ 
-                try{
+                $correct_url = false;
+                try{  
                     $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
                     $arrayOfCalendars = $client->findCalendars(); 
                     if(count($arrayOfCalendars)>0){
                         $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                        $correct_url = true;
                     }else{
-                        continue;
                     }
-                    $create_new = $client->create(helper::export($sumary,$desc, $st, $end,$new_uid,$status));
-                    $f = fopen('etags.txt','a');
-                    fwrite($f, $new_uid."\n");
-                    fclose($f);
-                }catch(Exception $e){
-                    print("EPESI to RADICALE user dont have set url". $br);
-                    continue;
-            }
-            }
-        }
-        Utils_RecordBrowserCommon::update_record('crm_meeting', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false); 
-        }
-        $datetime = $date." 00:00:00";
-        $rboTask =  new RBO_RecordsetAccessor('task');
-        $get_days2 = $rboTask->get_records(array('>=deadline' => $datetime,'uid' => ''));
-        foreach($get_days2 as $day){   
-        $created = $day->created_on;
-        $data_extra = $day->to_array();
-        $sumary = $data_extra["title"]; 
-        $st = $day['deadline']; 
-        $desc = $day->get_val('description');
-      //  $desc = str_replace("<br>", "  ", $desc);
-        $end = $st;
-        $new_uid = "EPESIexportTasks".$day->id;
-        if($day['timeless'] == '1'){
-            $time = $day['deadline'];
-            $time = $helper->toDateCAL($time);
-        }else{
-           $time = $day['deadline'];
-           
-        }
-        $created = $helper->toDateTimeCAL($created)."Z";
-        $status = $data_extra['permission'];
-        $status = $helper->set_access_status($status);
-        $employes = $data_extra["employees"];
-        foreach ($employes as $employer){
-            $user = $rbo->get_record($employer);
-            if($user->get_val('calendar_url') != ''){ 
-                try{
-                    $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
-                    $arrayOfCalendars = $client->findCalendars(); 
-                    if(count($arrayOfCalendars)>0){
-                        $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-                    }else{
-                        continue;
-                    }
-                    $create_new = $client->create(helper::export($sumary,$desc, $time, $time,$new_uid,$status));
-                    $f = fopen('etags.txt','a');
-                    fwrite($f, $new_uid."\n");
-                    fclose($f);
-                }catch(Exception $e){
-                    print("EPESI to RADICALE user dont have set url". $br);
-                    continue;
                 }
-            }
-        }
-       Utils_RecordBrowserCommon::update_record('task', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
-    }
-        //for phonecalls
-        $rboPhone =  new RBO_RecordsetAccessor('phonecall');
-        $get_days3 = $rboPhone->get_records(array('>=date_and_time' => $datetime,'uid' => ''));
-        foreach($get_days3 as $day){
-        $data_extra = $day->to_array();
-        $created =  $day->created_on;// $query[$l]["created_on"];
-        $sumary = $data_extra['subject'];// $query[$l]["f_subject"];
-        $st = $day['date_and_time'];// $query[$l]["f_date_and_time"];
-        $desc = $day->get_val('description');
-        $end = $st;
-        $phonenumber = $data_extra["other_phone_number"];
-        $who = $data_extra["other_customer_name"];
-        if($phonenumber == ""){ 
-            $klient = $data_extra["customer"];
-            $klient = explode("/", $klient);
-            $number = $klient[1];
-            $number = intval($number);
-            $klient = $klient[0];
-            if($klient == 'contact'){
-                $rb = new RBO_RecordsetAccessor('contact');
-                $x = $rb->get_record($number);
-                $who = $x->get_val('last_name',$nolink = True)." ".$x->get_val('first_name',$nolink = True);
-                $phonenumber = $x->get_val('work_phone');
-            if ($phonenumber == ""){ $phonenumber = $x->get_val("mobile_phone");}
-            }else{
-                $rb = new RBO_RecordsetAccessor('company');
-                $x = $rb->get_record($number);
-                $who = $x->get_val('company_name',$nolink = True);
-                $phonenumber =  $x->get_val('phone'); 
-            }
-        }
-        $new_uid = "EPESIexportPhones".$day->id;
-        $new_uid = str_replace(" ", "", $new_uid);
-        $sumary = $sumary." TEL: ".$phonenumber;
-        $sumary = $sumary." - ".$who;
-        $st = $helper->toDateTimeCAL($st);
-        $end = $helper->toDateTimeCAL($end);
-        $created = $helper->toDateTimeCAL($created)."Z";
-        $employes = $data_extra["employees"];
-        $status = $data_extra['permission'];
-        $status = $helper->set_access_status($status);
-        foreach ($employes as $employer){
-            $user = $rbo->get_record($employer);
-            if($user->get_val('calendar_url') != ''){ 
-                $client = new SimpleCalDAVClient();
-                try{
-                    $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
-                    $arrayOfCalendars = $client->findCalendars(); 
-                    if(count($arrayOfCalendars)>0){
-                        $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-                    }else{
-                        continue;
-                    }
-                    $create_new = $client->create(helper::export($sumary,$desc, $day['date_and_time'], $day['date_and_time'],$new_uid,$status));
-                    $f = fopen('etags.txt','a');
-                    fwrite($f, $new_uid."\n");
-                    fclose($f);}
-                    catch(Exception $e){
-                        print("EPESI to RADICALE user dont have set url". $br);
-                        continue;
-                    }
-            }
-        }
-        Utils_RecordBrowserCommon::update_record('phonecall', $day->id, array('uid' => $new_uid),$full_update=false, $date=null, $dont_notify=false);
-    }
-  }
-
-    public static function update_changes(){
-        $br = "<BR>";
-        print("UPDATE CHANGES ON SERVER ". $br);
-        $client = new SimpleCalDAVClient();
-        $helper = new helper();
-        $rbo = new RBO_RecordsetAccessor('contact');
-        $users_urls = $rbo->get_records(array('!calendar_url' => ''));
-        foreach($users_urls as $user ){      
-            try{
-            $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
-            $arrayOfCalendars = $client->findCalendars();     
-            if(count($arrayOfCalendars)>0){
-                $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-            }
-            else{
-                continue;
-            }
-            $start = $helper->get_date();
-            $result = $client->GetEvents($start);
-            for( $i = 0; $i < count($result); $i++) {
-                $exist = false;
-                $obj = new CalDAVObject($result[$i]->getHref(), $result[$i]->getData(), $result[$i]->getEtag());
-                $file = fopen("data.ics","w+");
-                fputs($file,$obj->getData(), strlen($obj->getData()));
-                fclose($file);
-                $ical = new ical('data.ics');
-                $event = $ical->events();
-                $summary = $event[0]["SUMMARY"]; 
-                $uid = $event[0]["UID"];
-                $start = $event[0]["DTSTART"];
-                $desc = $event[0]["DESCRIPTION"];
-                $end = $event[0]["DTEND"];
-                $status = null;
-                if(isset($event[0]["CLASS"])){
-                    $status = $event[0]["CLASS"];          
-                }
-                if($status == null){
-                    $status = "PUBLIC";
-                }
-                $status = $helper->set_access_status_numeric($status);
-                $time = $helper->convert_date_time($time);
-                $rbo_meet =  new RBO_RecordsetAccessor('crm_meeting');
-                $rbo_phone =  new RBO_RecordsetAccessor('phonecall');
-                $rbo_task =  new RBO_RecordsetAccessor('task');
-                $catch = $rbo_meet->get_records(array('uid' => $uid));
-                $catch2 = $rbo_phone->get_records(array('uid' => $uid));
-                $catch3 = $rbo_task->get_records(array('uid' => $uid));
-
-                if($catch != null){
-                    print("UPDATING meetings".$br);
-                    $get_event = $rbo_meet->get_records(array("uid" => $uid));
-                    foreach($get_event as $ev){
-                       $get_event = $ev;
-                    }
-                    $id = $get_event['id'];
-                    $change = false;
-                    $date = $helper->convert_date($start);
-                    $start = $helper->convert_date_time($start);
-                    if($start == ''){
-                        $start = null;
-                        $duration = -1;
-                    }else{
-                        $end = $helper->convert_date_time($end);
-                        $duration = $helper->duration($start, $end);
-                    } 
-                    if($summary != $get_event['title']){$change = true; }
-                    if($start != $get_event['time']){$change = true; }
-                    if($duration != $get_event['duration']){$change = true;}
-                    if($desc != $get_event['description']){$change = true;}
-                    if(intval($status) !=intval($get_event['permission'])){$change = true; }
-                    if($change == true){
-                        print("UPDATING - ".$uid." ".$br);
-                        Utils_RecordBrowserCommon::update_record('crm_meeting', $id, array('uid' => $uid,
-                    'title' => $summary,'date' => $date,'time' => $start,
-                    'duration' => $duration,'status' => 0, 'priority' => '1','description'=>$desc = str_replace('\n','<br>',$desc),
-                     'permission' => $status),$full_update=false, $date=null, $dont_notify=false);
-                    } else{
-                        print("No changes - no update".$br);
-                    }     
-                }
-
-                // PHOnes
-                if($catch2 != null){
-                    print("UPDATING phones".$br);
-                    $get_event = $rbo_phone->get_records(array("uid" => $uid));
-                    foreach($get_event as $ev){
-                       $get_event = $ev;
-                    }
-                    $id = $get_event['id'];
-                    $change = false;
-                    $start = $helper->convert_date_time($start);
-                    if($start == ''){
-                        $start =  $helper->convert_date($event[0]["DTSTART"])." 12:00:00";
-                        $end = $start;
-                    }
-                    $end = $start;
-                    $phonenumber = $get_event["other_phone_number"];
-                    $who = $record["other_customer_name"];
-                    if($phonenumber == ""){ 
-                        $klient = $get_event["customer"];
-                        $klient = explode("/", $klient);
-                        $number = $klient[1];
-                        $number = intval($number);
-                        $klient = $klient[0];
-                        if($klient == 'contact'){
-                            $rb = new RBO_RecordsetAccessor('contact');
-                            $x = $rb->get_record($number);
-                            $phonenumber = $x->get_val('work_phone');
-                            $who = $x->get_val('last_name',$nolink = True)." ".$x->get_val('first_name',$nolink = True);
-                        if ($phonenumber == ""){ $phonenumber = $x->get_val("mobile_phone");}
-                    }else{
-                        $rb = new RBO_RecordsetAccessor('company');
-                        $x = $rb->get_record($number);
-                        $who = $x->get_val('company_name',$nolink = True);
-                        $phonenumber =  $x->get_val('phone'); 
+                catch(Exception $e){}
+                if($correct_url){
+                    if($table == 'crm_meeting'){
+                        $desc = $record['description'];
+                        $desc = str_replace('<br>', '\n', $desc);
+                        $sumary = $record["title"];
+                        $st = $record['time'];
+                        $end = null;
+                        if($st == null){
+                            $st = $record['date'];
+                            $end = $record['date'];
                         }
-                    }
-                    if($desc != $get_event['description']){
-                        $change = true; 
-                    }
-                    $sum = $get_event['subject']." TEL: ".$phonenumber." - ".$who;
-                    if($summary != $sum){
-                        $change = true; 
-                        print("CHANGING SUMMARY <BR>"); 
-                        print("$sum :: $summary <BR>"); 
-                    }
-                    if($start != $get_event['date_and_time']){
-                        $change = true;
-                        print("CHANGING TIME <BR>");
-                        print("$start :: ".$get_event['date_and_time']." <BR>");
-                    }
-                    if(intval($status) != intval($get_event['permission'])){
-                        $change = true;  print("CHANGING PERMISSION <BR>"); }
-                    if($change == true){
-                        if($summary != $sum ){
-                            print("UPDATING ".$uid." ".$br);
-                            Utils_RecordBrowserCommon::update_record('phonecall', $id, array('uid' => $uid,
-                            'subject' => $summary,'date_and_time' => $start,
-                            'status' => 0, 'priority' => '1','description'=> $desc = str_replace('\n','<br>',$desc),
-                             'permission' => $status
-                        ),$full_update=false, $date=null, $dont_notify=false);
+                        if($end == null){
+                            $end = $record['duration'];  
+                            $time = $helper->calc_duration($st, $end);
+                            $end = $helper->toDateTimeCAL($time);
                         }
-                        else{
-                            print("UPDATING ".$uid." ".$br);
-                            Utils_RecordBrowserCommon::update_record('phonecall', $id, array('uid' => $uid,
-                            'date_and_time' => $start,
-                                'status' => 0, 'priority' => '1','description'=>$desc,
-                                'permission' => $status
-                            ),$full_update=false, $date=null, $dont_notify=false);
-                        }
-                    }else{
-                        print("No changes - no update ".$br);
-                    }     
-                }
-                if($catch3 != null){
-                    print("UPDATING - tasks ".$br);
-                    $get_event = $rbo_task->get_records(array("uid" => $uid));
-                    foreach($get_event as $ev){
-                        $get_event = $ev;
+                        $new_uid = $table."".$record['id'];
+                        $status = $record['permission'];
+                        $status = $helper->set_access_status($status);
+                        $create_new = $client->create(helper::export($sumary,$desc, $st, $end,$new_uid,$status));
+
+                        //zapisz do dodatkowej tabeli
+                        $data = array('uid' => $new_uid, 'table name' => 'crm_meeting', 'event_id' => $record['id'], 
+                                      'etag' => $create_new->getEtag() , 'href' => $create_new->getHref() );
+                        $events_list = $rbo_cal_events->new_record($data);   
+                        $events_list->created_by = $user->get_val('login');
+                        $events_list->created_on = $now;    
+                        $events_list->save();
+
                     }
-                    $id = $get_event['id'];
-                    $change = false;
-                    $date = $helper->convert_date($start);
-                    $start = $helper->convert_date_time($start);
-                    $without = 1;
-                    if($start == ''){
-                        $start = $date." 12:00:00";
-                        $without = 0;
-                    }
-                    if($desc != $get_event['description']){
-                        $change = true;
-                    }
-                    if($summary != $get_event['title']){
-                        $change = true;
-                    }
-                    if($start != $get_event['deadline']){
-                        $change = true;
-                    }
-                    if(intval($status) !=intval($get_event['permission'])){
-                        $change = true;     
-                    }
-                    if($change == true){
-                        if($without == 0){
-                            print("UPDATING ".$uid.$br);
-                            Utils_RecordBrowserCommon::update_record('task', $id, array('uid' => $uid,
-                            'title' => $summary,'deadline' => $start,'timeless' => '1',
-                            'status' => 0, 'priority' => '1','description'=>$desc,
-                            'permission' => $status),$full_update=false, $date=null, $dont_notify=false);
+                    if($table =='task'){
+                        $sumary = $record["title"]; 
+                        $st = $record['deadline']; 
+                        $desc = $record['description'];
+                        $end = $st;
+                        $new_uid = $table.$record['id'];
+                        if($record['timeless'] == '1'){
+                            $time = $record['deadline'];
+                            $time = $helper->toDateCAL($time);
                         }else{
-                            print("UPDATING ".$uid.$br);
-                            Utils_RecordBrowserCommon::update_record('task', $id, array('uid' => $uid,
-                            'title' => $summary,'deadline' => $start,'timeless' => '0',
-                            'status' => 0, 'priority' => '1','description'=>$desc,
-                            'permission' => $status),$full_update=false, $date=null, $dont_notify=false);     
+                           $time = $record['deadline'];
+                           
                         }
-                    }else{
-                        print("No changes no update ".$br);
-                    }             
-                }
-            }
-        }catch(Exception $e){
-            print("EPESI to RADICALE user dont have set url". $br);
-            continue;
-        }
-    }
-}
-    public static function delete($table,$record){
-        $client = new SimpleCalDAVClient();
-        $helper = new helper();
-        $rbo_user = new RBO_RecordsetAccessor("contact");
-        $start = null;
-        $end = null;
-        $uid = $record["uid"];
-        switch($table){
-            case "phonecall":
-                $start = $record['date_and_time'];
-                $start = strtotime($start);
-                $start = date('Ymd',$start);
-                $end = $start."T235959Z";
-                $start = $start."T000000Z";
-            break;
-            case "task":
-                $start = $record['deadline'];
-                $start = strtotime($start);
-                $start = date('Ymd',$start);
-                $end = $start."T235959Z";
-                $start = $start."T000000Z";
-            break;
-            case "crm_meeting":
-                $start = $record['date'];
-                $start = strtotime($start);
-                $start = date('Ymd',$start);
-                $end = $start."T235959Z";
-                $start = $start."T000000Z";
-            break;
-        }
-        $employes = $record["employees"];
-        foreach($employes as $employer){
-            $user = $rbo_user->get_record($employer);
-            if($user->get_val('calendar_url') != ""){
-                try{
-                $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
-                $arrayOfCalendars = $client->findCalendars(); 
-                if(count($arrayOfCalendars)>0){
-                    $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
-                }
-                else{
-                    continue;
-                }
-                $events = $client->getEvents($start,$end);
-                foreach($events as $event_){
-                    $obj = new CalDAVObject($event_->getHref(), $event_->getData(), $event_->getEtag());
-                    $file = fopen("data.ics","w+");
-                    fputs($file,$obj->getData(), strlen($obj->getData()));
-                    fclose($file);
-                    $ical = new ical('data.ics');
-                    $event = $ical->events();
-                    if($uid == $event[0]["UID"]){
-                        $client->delete($event_->getHref(),$event_->getEtag());
+                        $created = $helper->toDateTimeCAL($created)."Z";
+                        $status = $record['permission'];
+                        $status = $helper->set_access_status($status);
+                        $create_new = $client->create(helper::export($sumary,$desc, $time, $time,$new_uid,$status));
+
+                        //zapisz do dodatkowej tabeli
+                        $data = array('uid' => $new_uid, 'table name' => 'task', 'event_id' => $record['id'],
+                         'etag' => $create_new->getEtag(), 'href' => $create_new->getHref()  );
+                        $events_list = $rbo_cal_events->new_record($data); 
+                        $events_list->created_by = $user->get_val('login');
+                        $events_list->created_on = $now;      
+                        $events_list->save();
                     }
-                }
-                }catch(Exception $e){
-                    print("Bad user url".$br);
-                    continue;
+                    if($table == 'phonecall'){
+                        $sumary = $record['subject'];
+                        $st = $record['date_and_time'];
+                        $desc = $record['description'];
+                        $end = $st;
+                        $phonenumber = $record["other_phone_number"];
+                        $who = $record["other_customer_name"];
+                        if($phonenumber == ""){ 
+                            $klient = $record["customer"];
+                            $klient = explode("/", $klient);
+                            $number = $klient[1];
+                            $number = intval($number);
+                            $klient = $klient[0];
+                            if($klient == 'contact'){
+                                $rb = new RBO_RecordsetAccessor('contact');
+                                $x = $rb->get_record($number);
+                                $who = $x->get_val('last_name',$nolink = True)." ".$x->get_val('first_name',$nolink = True);
+                                $phonenumber = $x->get_val('work_phone');
+                            if ($phonenumber == ""){ $phonenumber = $x->get_val("mobile_phone");}
+                            }else{
+                                $rb = new RBO_RecordsetAccessor('company');
+                                $x = $rb->get_record($number);
+                                $who = $x->get_val('company_name',$nolink = True);
+                                $phonenumber =  $x->get_val('phone'); 
+                            }
+                        }
+                        $new_uid = "phonecall".$record['id'];
+                        $sumary = $sumary." TEL: ".$phonenumber;
+                        $sumary = $sumary." - ".$who;
+                        $st = $helper->toDateTimeCAL($st);
+                        $end = $helper->toDateTimeCAL($end);
+                        $created = $helper->toDateTimeCAL($created)."Z";
+                        $status = $record['permission'];
+                        $status = $helper->set_access_status($status);
+                        $create_new = $client->create(helper::export($sumary,$desc, $record['date_and_time'], $record['date_and_time'],$new_uid,$status));
+
+                        //zapisz do dodatkowej tabeli
+                        $data = array('uid' => $new_uid, 'table name' => 'phonecall', 'event_id' => $record['id'], 
+                                      'etag' => $create_new->getEtag() , 'href' => $create_new->getHref() );
+                        $events_list = $rbo_cal_events->new_record($data);   
+                        $events_list->created_by = $user->get_val('login');
+                        $events_list->created_on = $now;    
+                        $events_list->save();
+                    }
+
                 }
             }
         }   
+    }
+
+    public static function delete($table,$record){
+        $helper = new helper();
+        $rbo_user = new RBO_RecordsetAccessor("contact");
+        $rbo_cal_events = new RBO_RecordsetAccessor('calendar_sync');
+        $employers = $record['employees'];
+        foreach($employers as $employer){
+            $client = new SimpleCalDAVClient();
+            $user = $rbo_user->get_record($employer);
+            if($user->get_val('calendar_url') != ''){ 
+                $correct_url = false;
+                try{  
+                    $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+                    $arrayOfCalendars = $client->findCalendars(); 
+                    if(count($arrayOfCalendars)>0){
+                        $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                        $correct_url = true;
+                    }else{}
+                }
+                catch(Exception $e){}
+                if($correct_url){
+                    if($table == 'crm_meeting'){
+                        $events = $rbo_cal_events->get_records(array('event_id' => $record["id"], 'table_name' => $table),array(),array());
+                        foreach($events as $event){
+                            $client->delete($event['href'],$event['etag']);
+                        }
+                    }
+                    if($table == 'task'){
+                        $events = $rbo_cal_events->get_records(array('event_id' => $record['id'], 'table_name' => $table),array(),array());
+                        foreach($events as $event){
+                            $client->delete($event['href'],$event['etag']);
+
+                        }
+                    }
+                    if($table == 'phonecall'){
+                        $events = $rbo_cal_events->get_records(array('event_id' => $record['id'], 'table_name' => $table),array(),array());
+                        foreach($events as $event){
+                            $client->delete($event['href'],$event['etag']);
+                        }
+                    } 
+                }    
+            }
+        }
     }
     public static function edit($table,$record){
-        $br = "<BR>";
-        $client = new SimpleCalDAVClient();
         $helper = new helper();
         $rbo_user = new RBO_RecordsetAccessor("contact");
-        $start = null;
-        $end = null;
-        $uid = $record["uid"];
-        $title = "";
-        $cal_start_time = "";
-        $cal_end_time = "";
-        if($table ==  "phonecall"){
-                $start = $record['date_and_time'];
-                $cal_start_time = $record['date_and_time'];
-                $cal_end_time = $record['date_and_time'];
-                $start = strtotime($start);
-                $end = $start + (60*60*24*14);
-                $start = $start-(60*60*24*14);
-                $start = date('Ymd',$start);
-                $end = date("Ymd",$end);
-                $end = $end."T235959Z";
-                $start = $start."T000000Z";
-                $phonenumber = $record["other_phone_number"];
-                $who = $record["other_customer_name"];
-                if($phonenumber == ""){ 
-                    $klient = $record["customer"];
-                    $klient = explode("/", $klient);
-                    $number = $klient[1];
-                    $number = intval($number);
-                    $klient = $klient[0];
-                if($klient == 'contact'){
-                    $rb = new RBO_RecordsetAccessor('contact');
-                    $x = $rb->get_record($number);
-                    $phonenumber = $x->get_val('work_phone');
-                    $who = $x->get_val('last_name',$nolink = True)." ".$x->get_val('first_name',$nolink = True);
-                if ($phonenumber == ""){ $phonenumber = $x->get_val("mobile_phone");}
-                }else{
-                    $rb = new RBO_RecordsetAccessor('company');
-                    $x = $rb->get_record($number);
-                    $who = $x->get_val('company_name',$nolink = True);
-                    $phonenumber =  $x->get_val('phone'); 
-                    }
-                }
-                $title = $record["subject"]." TEL: ".$phonenumber. " - ".$who;
-            }
-            if( $table == "task"){ 
-                $start = $record['deadline'];
-                $start = strtotime($start);
-                $e = $start;
-                $s = $start - (60*60*24*14);
-                $e = $e + (60*60*24*14);
-                $start = date('Ymd',$s);
-                $end = date('Ymd',$e);
-                $end = $end."T235959Z";
-                $start = $start."T000000Z";
-                $title = $record["title"];
-                if($record['timeless'] == '1'){
-                    $time = $record['deadline'];
-                    $time = $helper->toDateCAL($time);
-                    $cal_start_time =$time;
-                    $cal_end_time = $cal_start_time;
-                }else{
-                   $cal_start_time = ($record['deadline']);
-                   $cal_end_time = $cal_start_time;
-                }
-            }
-            if( $table == "crm_meeting"){ 
-                $start = $record['date'];
-                $start = strtotime($start);
-                $end = $start + (60*60*24*14);
-                $start = $start - (60*60*24*14);
-                $start = date('Ymd',$start);
-                $end = date("Ymd",$end);
-                $end = $end."T235959Z";
-                $start = $start."T000000Z";
-                $title = $record["title"];
-                $cal_start_time = $record['time'];
-                $cal_end_time = null;
-                if($cal_start_time == null){
-                    $cal_start_time = $record['date'];
-                    $cal_end_time =$record['date'];
-                }
-                if($cal_end_time == null){
-                    $cal_end_time = $record['duration'];  
-                    $time = $helper->calc_duration($cal_start_time, $cal_end_time);
-                    $cal_end_time = $helper->toDateTimeCAL($time);
-                }
-            }
-        $employes = $record["employees"];
-        foreach($employes as $employer){
+        $rbo_cal_events = new RBO_RecordsetAccessor('calendar_sync');
+        $employers = $record['employees'];
+        foreach($employers as $employer){
+            $client = new SimpleCalDAVClient();
             $user = $rbo_user->get_record($employer);
-            if($user->get_val('calendar_url') != ""){
-                try{
-                $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
-                $arrayOfCalendars = $client->findCalendars(); 
-                if(count($arrayOfCalendars)>0){
-                    $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+            if($user->get_val('calendar_url') != ''){ 
+                $correct_url = false;
+                try{  
+                    $client->connect($user->get_val('calendar_url'), $user->get_val('login',$nolink=TRUE),$user->get_val("cal_password",$nolink=TRUE));
+                    $arrayOfCalendars = $client->findCalendars(); 
+                    if(count($arrayOfCalendars)>0){
+                        $client->setCalendar($arrayOfCalendars[$helper->get_calendar_name($user->get_val('calendar_url'))]);
+                        $correct_url = true;
+                    }else{}
                 }
-                $events = $client->getEvents($start,$end);
-                foreach($events as $event_){
-                    $obj = new CalDAVObject($event_->getHref(), $event_->getData(), $event_->getEtag());
-                    $file = fopen("data.ics","w+");
-                    fputs($file,$obj->getData(), strlen($obj->getData()));
-                    fclose($file);
-                    $ical = new ical('data.ics');
-                    $event = $ical->events();
-                    if($uid == $event[0]["UID"]){
+                catch(Exception $e){}
+                if($correct_url){
+                    if($table == 'crm_meeting'){
+                        $events = $rbo_cal_events->get_records(array('event_id' => $record["id"], 'table_name' => $table),array(),array());
+                        foreach($events as $event){
                             $desc = $record['description'];
-                            $desc = str_replace('\n','<br>', $desc);
-                            $status = $helper->set_access_status($record['permission']);
-                            $new_data = helper::export($title,$desc, $cal_start_time, $cal_end_time,$uid,$status);
-                            $obj = $client->change($obj->getHref(),$new_data,$obj->getEtag());
-                        //}
+                            $desc = str_replace('<br>', '\n', $desc);
+                            $sumary = $record["title"];
+                            $st = $record['time'];
+                            $end = null;
+                            if($st == null){
+                                $st = $record['date'];
+                                $end = $record['date'];
+                            }
+                            if($end == null){
+                                $end = $record['duration'];  
+                                $time = $helper->calc_duration($st, $end);
+                                $end = $helper->toDateTimeCAL($time);
+                            }
+                            $uid = $event['uid'];
+                            $status = $record['permission'];
+                            $status = $helper->set_access_status($status);
+                            $new_data = helper::export($sumary,$desc, $st, $end,$new_uid,$status);
+                            $obj = $client->change($event['href'],$new_data,$event['etag']);
+                            Utils_RecordBrowserCommon::update_record('calendar_sync', $event->id, 
+                                                                     array('etag' => $obj->getEtag(),'href'=> $obj->getHref()),
+                                                                     $full_update=false, 
+                                                                     $date=null, 
+                                                                     $dont_notify=false); 
+                        }
                     }
-                }
-                }catch(Exception $e){
-                    print("Bad user url".$br);
-                    continue;
+                    if($table == 'task'){
+                        $events = $rbo_cal_events->get_records(array('event_id' => $record['id'], 'table_name' => $table),array(),array());
+                        foreach($events as $event){
+                            $sumary = $record["title"]; 
+                            $st = $record['deadline']; 
+                            $desc = $record['description'];
+                            $end = $st;
+                            $uid = $event['uid'];
+                            if($record['timeless'] == '1'){
+                                $time = $record['deadline'];
+                                $time = $helper->toDateCAL($time);
+                            }else{
+                                $time = $record['deadline'];
+                            }
+                            $created = $helper->toDateTimeCAL($created)."Z";
+                            $status = $record['permission'];
+                            $status = $helper->set_access_status($status);
+                            $new_data = helper::export($sumary,$desc, $time, $time,$uid,$status);
+                            $obj = $client->change($event['href'],$new_data,$event['etag']);
+                            Utils_RecordBrowserCommon::update_record('calendar_sync', $event->id, 
+                                                                     array('etag' => $obj->getEtag(),'href'=> $obj->getHref()),
+                                                                     $full_update=false, 
+                                                                     $date=null, 
+                                                                     $dont_notify=false); 
+                        }
+                    }
+                    if($table == 'phonecall'){
+                        $events = $rbo_cal_events->get_records(array('event_id' => $record['id'], 'table_name' => $table),array(),array());
+                        foreach($events as $event){
+                            $sumary = $record['subject'];
+                            $st = $record['date_and_time'];
+                            $desc = $record['description'];
+                            $end = $st;
+                            $phonenumber = $record["other_phone_number"];
+                            $who = $record["other_customer_name"];
+                            if($phonenumber == ""){ 
+                                $klient = $record["customer"];
+                                $klient = explode("/", $klient);
+                                $number = $klient[1];
+                                $number = intval($number);
+                                $klient = $klient[0];
+                                if($klient == 'contact'){
+                                    $rb = new RBO_RecordsetAccessor('contact');
+                                    $x = $rb->get_record($number);
+                                    $who = $x->get_val('last_name',$nolink = True)." ".$x->get_val('first_name',$nolink = True);
+                                    $phonenumber = $x->get_val('work_phone');
+                                if ($phonenumber == ""){ $phonenumber = $x->get_val("mobile_phone");}
+                                }else{
+                                    $rb = new RBO_RecordsetAccessor('company');
+                                    $x = $rb->get_record($number);
+                                    $who = $x->get_val('company_name',$nolink = True);
+                                    $phonenumber =  $x->get_val('phone'); 
+                                }
+                            }
+                            $uid = $event['uid'];
+                            $sumary = $sumary." TEL: ".$phonenumber;
+                            $sumary = $sumary." - ".$who;
+                            $st = $helper->toDateTimeCAL($st);
+                            $end = $helper->toDateTimeCAL($end);
+                            $status = $record['permission'];
+                            $status = $helper->set_access_status($status);
+                            $new_data = helper::export($sumary,$desc, $st,
+                            $end,$uid,$status);
+                            $obj = $client->change($event['href'],$new_data,$event['etag']);
+                            Utils_RecordBrowserCommon::update_record('calendar_sync', $event->id, 
+                                                                      array('etag' => $obj->getEtag(),'href'=> $obj->getHref()),
+                                                                      $full_update=false, 
+                                                                      $date=null, 
+                                                                      $dont_notify=false); 
+                        }
+                    } 
                 }
             }
-        }   
-    }
-    public static function get_calendar_table_from_int($table_int){
-        switch($table_int){
-            case 1:
-                return "phonecall";
-            break;
-
-            case 2:
-                return "task";
-            break;
-
-            case 3:
-                 return "crm_meeting";  
-            break;
-            
         }
     }
+
+
     public static function on_action_meeting($record, $mode){
         if ($mode === 'edit'){
             iCalSyncCommon::edit('crm_meeting',$record);
@@ -794,7 +576,7 @@ class iCalSyncCommon extends ModuleCommon {
             iCalSyncCommon::delete("crm_meeting",$record);
         }
         if($mode === "added"){
-            iCalSyncCommon::push_events();
+            iCalSyncCommon::event_to_server($record, 'crm_meeting');
         }
     }
     public static function on_action_phonecall($record, $mode){
@@ -805,7 +587,7 @@ class iCalSyncCommon extends ModuleCommon {
             iCalSyncCommon::delete("phonecall",$record);
         }
         if($mode === "added"){
-            iCalSyncCommon::push_events();
+            iCalSyncCommon::event_to_server($record,'phonecall');
         }
     }
     public static function on_action_task($record, $mode){
@@ -816,7 +598,7 @@ class iCalSyncCommon extends ModuleCommon {
             iCalSyncCommon::delete("task",$record);
         }
         if($mode === "added"){
-            iCalSyncCommon::push_events();
+            iCalSyncCommon::event_to_server($record,'task');
         }
     }
 }

@@ -15,7 +15,7 @@ class iCalSyncCommon extends ModuleCommon {
     public static function user_settings() {
         return array("iCalSync" => 'settings');
      }
-     
+
     public static function cron() {
         return array(
            'insert_from_server' => 2, 
@@ -141,7 +141,7 @@ class iCalSyncCommon extends ModuleCommon {
         print("<BR>".count($users)." użytkownikow do przejrzenia<BR>");
         foreach ($users as $user){
             $_user = $rbo->get_record($user->id);
-            $name = $_user->get_val('login',$nolink=True);
+            $name = $_user->get_val('login',$nolink=TRUE);
             $client = new SimpleCalDAVClient();
             $correct_url = false;
                 try{  
@@ -312,7 +312,9 @@ class iCalSyncCommon extends ModuleCommon {
                         $new_uid = $table."".$record['id'];
                         $status = $record['permission'];
                         $status = $helper->set_access_status($status);
-                        $create_new = $client->create(helper::export($sumary,$desc, $st, $end,$new_uid,$status));
+                        try{
+                            $create_new = $client->create(helper::export($sumary,$desc, $st, $end,$new_uid,$status));
+                        }catch(Exception $e){}
 
                         //zapisz do dodatkowej tabeli
                         $data = array('uid' => $new_uid, 'table name' => 'crm_meeting', 'event_id' => $record['id'], 
@@ -339,7 +341,9 @@ class iCalSyncCommon extends ModuleCommon {
                         $created = $helper->toDateTimeCAL($created)."Z";
                         $status = $record['permission'];
                         $status = $helper->set_access_status($status);
-                        $create_new = $client->create(helper::export($sumary,$desc, $time, $time,$new_uid,$status));
+                        try{
+                            $create_new = $client->create(helper::export($sumary,$desc, $time, $time,$new_uid,$status));
+                        }catch(Exception $e){}
 
                         //zapisz do dodatkowej tabeli
                         $data = array('uid' => $new_uid, 'table name' => 'task', 'event_id' => $record['id'],
@@ -383,7 +387,9 @@ class iCalSyncCommon extends ModuleCommon {
                         $created = $helper->toDateTimeCAL($created)."Z";
                         $status = $record['permission'];
                         $status = $helper->set_access_status($status);
-                        $create_new = $client->create(helper::export($sumary,$desc, $st, $end,$new_uid,$status));
+                        try{
+                            $create_new = $client->create(helper::export($sumary,$desc, $st, $end,$new_uid,$status));
+                        }catch(Exception $e){}
 
                         //zapisz do dodatkowej tabeli
                         $data = array('uid' => $new_uid, 'table name' => 'phonecall', 'event_id' => $record['id'], 

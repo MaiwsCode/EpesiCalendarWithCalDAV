@@ -13,9 +13,9 @@ require 'client/helper.php';
 class iCalSyncCommon extends ModuleCommon {
 
     public static function user_settings() {
-        return array("iCalSync"=> 'settings');
+        return array("iCalSync" => 'settings');
      }
-
+     
     public static function cron() {
         return array(
            'insert_from_server' => 2, 
@@ -383,7 +383,7 @@ class iCalSyncCommon extends ModuleCommon {
                         $created = $helper->toDateTimeCAL($created)."Z";
                         $status = $record['permission'];
                         $status = $helper->set_access_status($status);
-                        $create_new = $client->create(helper::export($sumary,$desc, $record['date_and_time'], $record['date_and_time'],$new_uid,$status));
+                        $create_new = $client->create(helper::export($sumary,$desc, $st, $end,$new_uid,$status));
 
                         //zapisz do dodatkowej tabeli
                         $data = array('uid' => $new_uid, 'table name' => 'phonecall', 'event_id' => $record['id'], 
@@ -422,20 +422,26 @@ class iCalSyncCommon extends ModuleCommon {
                     if($table == 'crm_meeting'){
                         $events = $rbo_cal_events->get_records(array('event_id' => $record["id"], 'table_name' => $table),array(),array());
                         foreach($events as $event){
-                            $client->delete($event['href'],$event['etag']);
+                            try{
+                                $client->delete($event['href'],$event['etag']);
+                            }catch(Exception $e){}
                         }
                     }
                     if($table == 'task'){
                         $events = $rbo_cal_events->get_records(array('event_id' => $record['id'], 'table_name' => $table),array(),array());
                         foreach($events as $event){
-                            $client->delete($event['href'],$event['etag']);
+                            try{
+                                $client->delete($event['href'],$event['etag']);
+                            }catch(Exception $e){}
 
                         }
                     }
                     if($table == 'phonecall'){
                         $events = $rbo_cal_events->get_records(array('event_id' => $record['id'], 'table_name' => $table),array(),array());
                         foreach($events as $event){
-                            $client->delete($event['href'],$event['etag']);
+                            try{
+                                $client->delete($event['href'],$event['etag']);
+                            }catch(Exception $e){}
                         }
                     } 
                 }    

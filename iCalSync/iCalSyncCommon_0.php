@@ -133,7 +133,7 @@ class iCalSyncCommon extends ModuleCommon {
             }
         }
     }
-    public static function update_changes_from_server(){
+    public static function update_changes_from_server($save_changes = true){
         $helper = new helper();
         $rbo = new RBO_RecordsetAccessor('contact');
         $rbo_cal_events = new RBO_RecordsetAccessor('calendar_sync');
@@ -205,20 +205,22 @@ class iCalSyncCommon extends ModuleCommon {
                                         $end = $helper->convert_date_time($end);
                                         $duration = $helper->duration($start, $end);
                                     }
-                                    Utils_RecordBrowserCommon::update_record('calendar_sync', $event->id, 
+                                    $rbo_cal_events->update_record( $event->id, 
                                         array('etag' => $result[$i]->getEtag(),'href'=> $result[$i]->getHref()),
                                         $full_update=false, 
                                         $date=null, 
                                         $dont_notify=false);    
-                                    $succes = $changes->update_record($event['event_id'], array(
-                                        'date' => $_date, 
-                                        'time' => $start ,
-                                        'title' => $summary,
-                                        'duration' => $duration,
-                                        'permission' => $status,
-                                        'description'=>$desc,
-                                    ));
-                                    print("Aktualizacja zakończona". $success);
+                                    if($save_changes){
+                                        $succes = $changes->update_record($event['event_id'], array(
+                                            'date' => $_date, 
+                                            'time' => $start ,
+                                            'title' => $summary,
+                                            'duration' => $duration,
+                                            'permission' => $status,
+                                            'description'=>$desc,
+                                        ));
+                                        print("Aktualizacja zakończona". $success);
+                                    }
                                 }
                                 if($event_type == 'task'){
                                     $_date = $helper->convert_date($start);
@@ -228,19 +230,21 @@ class iCalSyncCommon extends ModuleCommon {
                                         $start = $_date." 12:00:00";
                                         $without = 1;
                                     }
-                                    Utils_RecordBrowserCommon::update_record('calendar_sync', $event->id, 
+                                    $rbo_cal_events->update_record($event->id, 
                                     array('etag' => $result[$i]->getEtag(),'href'=> $result[$i]->getHref()),
                                     $full_update=false, 
                                     $date=null, 
                                     $dont_notify=false);    
-                                    $succes = $changes->update_record($event['event_id'], array(
-                                        'deadline' => $start,
-                                        'title' => $summary,
-                                        'timeless' => $without,
-                                        'permission' => $status,
-                                        'description'=>$desc,
-                                    ));
-                                print("Aktualizacja zakończona". $success);
+                                    if($save_changes){
+                                        $succes = $changes->update_record($event['event_id'], array(
+                                            'deadline' => $start,
+                                            'title' => $summary,
+                                            'timeless' => $without,
+                                            'permission' => $status,
+                                            'description'=>$desc,
+                                        ));
+                                        print("Aktualizacja zakończona". $success);
+                                    }
                                 }
                                 if($event_type == 'phonecall'){
                                     $start = $_event[0]["DTSTART"];
@@ -250,18 +254,20 @@ class iCalSyncCommon extends ModuleCommon {
                                         $end = $start;
                                     }
                                     $end = $start;
-                                    Utils_RecordBrowserCommon::update_record('calendar_sync', $event->id, 
+                                    $rbo_cal_events->update_record( $event->id, 
                                     array('etag' => $result[$i]->getEtag(),'href'=> $result[$i]->getHref()),
                                     $full_update=false, 
                                     $date=null, 
                                     $dont_notify=false);    
-                                $succes = $changes->update_record($event['event_id'], array(
-                                    'subject' => $summary,
-                                    'date_and_time' => $start,
-                                    'permission' => $status,
-                                    'description'=>$desc,
-                                ));
-                                print("Aktualizacja zakończona". $success);
+                                    if($save_changes){
+                                        $succes = $changes->update_record($event['event_id'], array(
+                                            'subject' => $summary,
+                                            'date_and_time' => $start,
+                                            'permission' => $status,
+                                            'description'=>$desc,
+                                        ));
+                                        print("Aktualizacja zakończona". $success);
+                                    }
                                 }
                                 //wprowadzam zmiany na epesi
                                 //aktualizuje etag 
@@ -455,6 +461,7 @@ class iCalSyncCommon extends ModuleCommon {
         }
     }
     public static function edit($table,$record){
+        iCalSyncCommon::update_changes_from_server($save_changes = false);
         $helper = new helper();
         $rbo_user = new RBO_RecordsetAccessor("contact");
         $rbo_cal_events = new RBO_RecordsetAccessor('calendar_sync');
@@ -495,12 +502,17 @@ class iCalSyncCommon extends ModuleCommon {
                             $status = $record['permission'];
                             $status = $helper->set_access_status($status);
                             $new_data = helper::export($sumary,$desc, $st, $end,$new_uid,$status);
-                            $obj = $client->change($event['href'],$new_data,$event['etag']);
-                            Utils_RecordBrowserCommon::update_record('calendar_sync', $event->id, 
-                                                                     array('etag' => $obj->getEtag(),'href'=> $obj->getHref()),
-                                                                     $full_update=false, 
-                                                                     $date=null, 
-                                                                     $dont_notify=false); 
+                            try{
+                                $obj = $client->change($event['href'],$new_data,$event['etag']);
+                                Utils_RecordBrowserCommon::update_record('calendar_sync', $event->id, 
+                                                                        array('etag' => $obj->getEtag(),'href'=> $obj->getHref()),
+                                                                        $full_update=false, 
+                                                                        $date=null, 
+                                                                        $dont_notify=false); 
+                            }catch(Exception $e){
+                                Epesi::alert("Nie możesz edytować tego wydarzenia ponieważ zostało ono usięte. 
+                                    W przeciągu kilku minut powinno zniknąć z widoku");
+                            }
                         }
                     }
                     if($table == 'task'){
@@ -521,12 +533,17 @@ class iCalSyncCommon extends ModuleCommon {
                             $status = $record['permission'];
                             $status = $helper->set_access_status($status);
                             $new_data = helper::export($sumary,$desc, $time, $time,$uid,$status);
+                            try{
                             $obj = $client->change($event['href'],$new_data,$event['etag']);
                             Utils_RecordBrowserCommon::update_record('calendar_sync', $event->id, 
                                                                      array('etag' => $obj->getEtag(),'href'=> $obj->getHref()),
                                                                      $full_update=false, 
                                                                      $date=null, 
                                                                      $dont_notify=false); 
+                            }catch(Exception $e){
+                                Epesi::alert("Nie możesz edytować tego wydarzenia ponieważ zostało ono usięte. 
+                                    W przeciągu kilku minut powinno zniknąć z widoku");
+                            }
                         }
                     }
                     if($table == 'phonecall'){
@@ -566,12 +583,17 @@ class iCalSyncCommon extends ModuleCommon {
                             $status = $helper->set_access_status($status);
                             $new_data = helper::export($sumary,$desc, $st,
                             $end,$uid,$status);
-                            $obj = $client->change($event['href'],$new_data,$event['etag']);
-                            Utils_RecordBrowserCommon::update_record('calendar_sync', $event->id, 
-                                                                      array('etag' => $obj->getEtag(),'href'=> $obj->getHref()),
-                                                                      $full_update=false, 
-                                                                      $date=null, 
-                                                                      $dont_notify=false); 
+                            try{
+                                $obj = $client->change($event['href'],$new_data,$event['etag']);
+                                Utils_RecordBrowserCommon::update_record('calendar_sync', $event->id, 
+                                                                        array('etag' => $obj->getEtag(),'href'=> $obj->getHref()),
+                                                                        $full_update=false, 
+                                                                        $date=null, 
+                                                                        $dont_notify=false); 
+                            }catch(Exception $e){
+                                Epesi::alert("Nie możesz edytować tego wydarzenia ponieważ zostało ono usięte. 
+                                    W przeciągu kilku minut powinno zniknąć z widoku");
+                            }
                         }
                     } 
                 }
